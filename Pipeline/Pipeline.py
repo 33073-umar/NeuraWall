@@ -1,5 +1,24 @@
 import os
 import subprocess
+import pandas as pd
+
+column_mapping = {
+    "Flow Duration": "Flow Duration",
+    "Flow Byts/s": "Flow Bytes/s",
+    "Flow Pkts/s": "Flow Packets/s",
+    "Tot Fwd Pkts": "Total Fwd Packets",
+    "Tot Bwd Pkts": "Total Backward Packets",
+    "Pkt Size Avg": "Average Packet Size",
+    "Pkt Len Std": "Packet Length Std",
+    "Flow IAT Mean": "Flow IAT Mean",
+    "Flow IAT Std": "Flow IAT Std",
+    "Fwd IAT Mean": "Fwd IAT Mean",
+    "Bwd IAT Mean": "Bwd IAT Mean",
+    "SYN Flag Cnt": "SYN Flag Count",
+    "ACK Flag Cnt": "ACK Flag Count",
+    "RST Flag Cnt": "RST Flag Count"
+}
+
 
 # Step 1: Capture traffic using dumpcap
 def capture_traffic_dumpcap(interface_number, output_dir, capture_duration=30):
@@ -44,6 +63,20 @@ def generate_csv(pcap_file, output_dir, gradle_dir):
     
     return csv_file
 
+# Step 3: Standardize the CSV
+def standardize_csv(file_path, column_mapping):
+    print("\n=== Step 3: Standardizing the CSV ===")
+    data = pd.read_csv(file_path)
+    data.columns = data.columns.str.strip()  # Remove any leading/trailing whitespace
+    
+    # Rename columns based on the mapping
+    standardized_data = data.rename(columns=column_mapping)
+    
+    # Overwrite the original file with standardized data
+    standardized_data.to_csv(file_path, index=False)
+    print(f"Standardized file saved to {file_path}")
+
+
 # Main Execution Flow
 if __name__ == "__main__":
     # Step 1: Capture traffic
@@ -54,4 +87,7 @@ if __name__ == "__main__":
 
     # Step 2: Generate CSV from PCAP
     csv_file = generate_csv(pcap_file, output_dir, gradle_dir)
+
+    # Step 3: Standardize CSV
+    standardize_csv(csv_file, column_mapping)
 
