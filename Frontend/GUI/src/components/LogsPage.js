@@ -34,8 +34,6 @@ const LogsPage = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10); // Rows per page
   const [currentPage, setCurrentPage] = useState(0); // Current page index
   const [realTimeEnabled, setRealTimeEnabled] = useState(false); // Toggle for real-time updates
-  const [startTime, setStartTime] = useState(""); // Start time for filtering
-  const [endTime, setEndTime] = useState(""); // End time for filtering
 
   // Fetch logs
   const fetchLogs = () => {
@@ -69,34 +67,21 @@ const LogsPage = () => {
 
   // Perform filtering when the search button is clicked
   const handleSearch = () => {
-    let filtered = logs;
-
-    // Apply text-based search
-    if (tempQuery) {
-      filtered = filtered.filter((log) => {
-        const valueToSearch =
-          selectedColumn === "All"
-            ? Object.values(log).join(" ") // Search across all columns
-            : log[selectedColumn] || ""; // Search in specific column
-
-        return String(valueToSearch) // Ensure it's a string
-          .toLowerCase() // Convert to lowercase for case-insensitive matching
-          .includes(tempQuery.toLowerCase());
-      });
+    if (!tempQuery) {
+      setFilteredLogs(logs); // Reset to original logs if query is empty
+      return;
     }
 
-    // Apply time-based range filtering
-    if (startTime || endTime) {
-      filtered = filtered.filter((log) => {
-        const logTime = log.Time;
-        if (!logTime) return false;
+    const filtered = logs.filter((log) => {
+      const valueToSearch =
+        selectedColumn === "All"
+          ? Object.values(log).join(" ") // Search across all columns
+          : log[selectedColumn] || ""; // Search in specific column
 
-        const startCondition = startTime ? logTime >= startTime : true;
-        const endCondition = endTime ? logTime <= endTime : true;
-
-        return startCondition && endCondition;
-      });
-    }
+      return String(valueToSearch) // Ensure it's a string
+        .toLowerCase() // Convert to lowercase for case-insensitive matching
+        .includes(tempQuery.toLowerCase());
+    });
 
     setFilteredLogs(filtered); // Update filtered logs
     setCurrentPage(0); // Reset to the first page
@@ -149,26 +134,7 @@ const LogsPage = () => {
           </Box>
 
           {/* Search Controls */}
-          <Box mb={3} display="flex" justifyContent="center" gap={2} flexWrap="wrap">
-            {/* Time Range Inputs */}
-            <TextField
-              label="Start Time (HH:MM:SS AM/PM)"
-              variant="outlined"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              placeholder="03:42:14 PM"
-              sx={{ width: "20%" }}
-            />
-            <TextField
-              label="End Time (HH:MM:SS AM/PM)"
-              variant="outlined"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-              placeholder="04:00:00 PM"
-              sx={{ width: "20%" }}
-            />
-
-            {/* Search Column and Query */}
+          <Box mb={3} display="flex" justifyContent="center" gap={2}>
             <FormControl sx={{ width: "20%" }}>
               <InputLabel id="search-column-label">Search Column</InputLabel>
               <Select
@@ -193,11 +159,11 @@ const LogsPage = () => {
               variant="outlined"
               value={tempQuery} // Bind to tempQuery
               onChange={(e) => setTempQuery(e.target.value)} // Update tempQuery
-              sx={{ width: "20%" }}
+              sx={{ width: "50%" }}
             />
 
             <Button variant="contained" color="primary" onClick={handleSearch}>
-              Filter
+              Search
             </Button>
           </Box>
 

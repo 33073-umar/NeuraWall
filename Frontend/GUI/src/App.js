@@ -5,6 +5,7 @@ import LoginPage from "./components/LoginPage";
 import LogsPage from "./components/LogsPage";
 import MaliciousIPPage from "./components/MaliciousIPPage";
 import AdminPanel from "./components/AdminPanel"; // Import AdminPanel
+import AnalyticsPage from "./components/AnalyticsPage"; // Import AnalyticsPage
 
 const App = () => {
   // Check if user is already logged in by checking localStorage
@@ -36,6 +37,10 @@ const App = () => {
         <Route
           path="/malicious-ip"
           element={isLoggedIn ? <MaliciousIPPage /> : <Navigate to="/" />}
+        />
+        <Route
+          path="/analytics"
+          element={isLoggedIn ? <AnalyticsPage /> : <Navigate to="/" />}
         />
 
         {/* Admin Panel route (protected if logged in) */}

@@ -27,7 +27,7 @@ const LoginPage = ({ setIsLoggedIn }) => {
       bgcolor="#f4f6f8"
     >
       <Typography variant="h4" mb={4}>
-        NeuraWAll
+        NeuraWall
       </Typography>
       <TextField
         label="Username"

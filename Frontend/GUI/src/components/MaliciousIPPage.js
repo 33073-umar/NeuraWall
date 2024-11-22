@@ -1,91 +1,188 @@
-import React, { useState } from "react";
-import { Box, Typography, Paper, Button, Divider, Grid } from "@mui/material";
+import React, { useEffect, useState } from "react";
+import {
+  Box,
+  Typography,
+  Paper,
+  CircularProgress,
+  Button,
+  TextField,
+  Switch,
+  FormControlLabel,
+  TablePagination,
+} from "@mui/material";
+import axios from "axios";
 
 const MaliciousIPPage = () => {
-  const maliciousIPs = [
-    { ip: "192.168.100.1", activity: [{ timestamp: "2024-11-18 10:00:00", request: "GET /api/data" }] },
-    { ip: "10.0.0.5", activity: [{ timestamp: "2024-11-18 10:05:00", request: "POST /api/login" }] },
-    { ip: "172.16.0.3", activity: [{ timestamp: "2024-11-18 10:10:00", request: "GET /api/info" }] },
-  ];
+  const [maliciousIPs, setMaliciousIPs] = useState([]); // List of malicious IPs
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [newIP, setNewIP] = useState(""); // New IP to add
+  const [realTimeEnabled, setRealTimeEnabled] = useState(false); // Toggle for real-time updates
+  const [rowsPerPage, setRowsPerPage] = useState(10); // Rows per page
+  const [currentPage, setCurrentPage] = useState(0); // Current page index
 
-  const [selectedIP, setSelectedIP] = useState(null);
-
-  const handleIPClick = (ip) => {
-    setSelectedIP(ip);
+  // Fetch malicious IPs from the backend
+  const fetchMaliciousIPs = () => {
+    axios
+      .get("http://127.0.0.1:5000/api/malicious_ips") // Backend API endpoint
+      .then((response) => {
+        setMaliciousIPs(response.data);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("Error fetching malicious IPs:", error);
+        setError("Failed to load malicious IPs.");
+        setLoading(false);
+      });
   };
 
+  // Add a new malicious IP
+  const handleAddIP = () => {
+    if (!newIP) {
+      alert("Please enter an IP address.");
+      return;
+    }
+
+    axios
+      .post("http://127.0.0.1:5000/api/malicious_ips", { IP: newIP }) // POST API endpoint
+      .then(() => {
+        setMaliciousIPs((prevIPs) => [...prevIPs, { IP: newIP }]); // Update state
+        setNewIP(""); // Clear input
+        alert("IP blocked successfully.");
+      })
+      .catch((error) => {
+        console.error("Error adding IP:", error);
+        alert("Failed to block the IP. It may already exist.");
+      });
+  };
+
+  // Unblock an IP
+  const handleUnblock = (ip) => {
+    axios
+      .delete(`http://127.0.0.1:5000/api/malicious_ips/${ip}`) // Correct DELETE API endpoint
+      .then(() => {
+        setMaliciousIPs((prevIPs) => prevIPs.filter((ipData) => ipData.IP !== ip));
+      })
+      .catch((error) => {
+        console.error("Error unblocking IP:", error);
+        alert("Failed to unblock the IP.");
+      });
+  };
+
+  // Handle page change
+  const handlePageChange = (_, newPage) => {
+    setCurrentPage(newPage);
+  };
+
+  // Handle rows per page change
+  const handleRowsPerPageChange = (event) => {
+    const value = event.target.value === "All" ? maliciousIPs.length : parseInt(event.target.value, 10);
+    setRowsPerPage(value);
+    setCurrentPage(0); // Reset to the first page
+  };
+
+  useEffect(() => {
+    fetchMaliciousIPs(); // Fetch data on component mount
+
+    // Real-time updates
+    let interval;
+    if (realTimeEnabled) {
+      interval = setInterval(() => {
+        fetchMaliciousIPs();
+      }, 5000); // Refresh every 5 seconds
+    }
+    return () => clearInterval(interval); // Cleanup interval on unmount or toggle off
+  }, [realTimeEnabled]);
+
+  // Get paginated malicious IPs
+  const paginatedIPs =
+    rowsPerPage === maliciousIPs.length
+      ? maliciousIPs
+      : maliciousIPs.slice(currentPage * rowsPerPage, currentPage * rowsPerPage + rowsPerPage);
+
   return (
-    <Box p={3} bgcolor="#f4f6f8" height="100vh">
+    <Box p={3} bgcolor="#f4f6f8" minHeight="100vh">
       <Typography variant="h4" mb={3} fontWeight="bold" textAlign="center">
         Malicious IPs
       </Typography>
 
-      {/* List of Malicious IPs */}
-      {maliciousIPs.map((ipData, index) => (
-        <Paper
-          key={index}
-          elevation={3}
-          sx={{
-            p: 2,
-            mb: 2,
-            cursor: "pointer",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            "&:hover": { backgroundColor: "#e8f5e9" },
-          }}
-          onClick={() => handleIPClick(ipData)}
-        >
-          <Typography variant="body1" sx={{ fontWeight: "bold" }}>
-            {ipData.ip}
-          </Typography>
-          <Button variant="contained" color="success">
-            Allow
-          </Button>
-        </Paper>
-      ))}
+      {/* Real-Time Toggle */}
+      <Box mb={3} display="flex" justifyContent="flex-end" pr={5}>
+        <FormControlLabel
+          control={
+            <Switch
+              checked={realTimeEnabled}
+              onChange={(e) => setRealTimeEnabled(e.target.checked)}
+              color="primary"
+            />
+          }
+          label="Real-Time Updates"
+        />
+      </Box>
 
-      <Divider sx={{ my: 3 }} />
+      {/* Add IP Form */}
+      <Box mb={3} display="flex" justifyContent="center" alignItems="center" gap={2}>
+        <TextField
+          label="Enter IP Address"
+          variant="outlined"
+          value={newIP}
+          onChange={(e) => setNewIP(e.target.value)}
+          sx={{ width: "40%" }}
+        />
+        <Button variant="contained" color="error" onClick={handleAddIP}>
+          Block IP
+        </Button>
+      </Box>
 
-      {/* Display IP Activity Details */}
-      {selectedIP ? (
-        <Box>
-          <Typography variant="h5" mb={2}>
-            Activity for IP: {selectedIP.ip}
-          </Typography>
-          {selectedIP.activity.length > 0 ? (
-            <Grid container spacing={2}>
-              <Grid item xs={4}>
-                <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                  Timestamp
-                </Typography>
-              </Grid>
-              <Grid item xs={8}>
-                <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                  Request
-                </Typography>
-              </Grid>
+      {loading ? (
+        <CircularProgress color="primary" size={50} sx={{ display: "block", margin: "0 auto" }} />
+      ) : error ? (
+        <Typography color="error" textAlign="center">
+          {error}
+        </Typography>
+      ) : maliciousIPs.length > 0 ? (
+        <>
+          {/* Paginated IPs */}
+          {paginatedIPs.map((ipData, index) => (
+            <Paper
+              key={index}
+              elevation={3}
+              sx={{
+                p: 2,
+                mb: 2,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Typography variant="body1" sx={{ fontWeight: "bold" }}>
+                {ipData.IP}
+              </Typography>
+              <Button
+                variant="contained"
+                color="success" // Green unblock button
+                onClick={() => handleUnblock(ipData.IP)}
+              >
+                Unblock
+              </Button>
+            </Paper>
+          ))}
 
-              {selectedIP.activity.map((entry, index) => (
-                <React.Fragment key={index}>
-                  <Grid item xs={4}>
-                    <Typography variant="body2">{entry.timestamp}</Typography>
-                  </Grid>
-                  <Grid item xs={8}>
-                    <Typography variant="body2">{entry.request}</Typography>
-                  </Grid>
-                </React.Fragment>
-              ))}
-            </Grid>
-          ) : (
-            <Typography variant="body2" color="textSecondary">
-              No activity recorded for this IP.
-            </Typography>
-          )}
-        </Box>
+          {/* Pagination Controls */}
+          <Box display="flex" justifyContent="center" mt={3}>
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25, "All"]}
+              count={maliciousIPs.length} // Total malicious IPs
+              rowsPerPage={rowsPerPage} // Current rows per page
+              page={currentPage} // Current page index
+              onPageChange={handlePageChange} // Page change handler
+              onRowsPerPageChange={handleRowsPerPageChange} // Rows per page change handler
+            />
+          </Box>
+        </>
       ) : (
         <Typography variant="body2" color="textSecondary" textAlign="center">
-          Click on an IP to view its activity.
+          No malicious IPs recorded.
         </Typography>
       )}
     </Box>

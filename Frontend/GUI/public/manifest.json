@@ -1,6 +1,6 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "name": "NeuraWall",
+  "short_name": "NeuraWall",
   "icons": [
     {
       "src": "favicon.ico",
