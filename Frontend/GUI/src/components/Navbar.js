@@ -37,10 +37,10 @@ const Navbar = ({ isLoggedIn, setIsLoggedIn }) => {
               </Button>
               <Button
                 component={Link}
-                to="/malicious-ip"
+                to="/ip-management"
                 sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}
               >
-                Malicious IPs
+                IP Management
               </Button>
               <Button
                 component={Link}
