@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import Navbar from "./components/Navbar";
 import LoginPage from "./components/LoginPage";
 import LogsPage from "./components/LogsPage";
-import MaliciousIPPage from "./components/MaliciousIPPage";
+import IPManagementPage from "./components/IPManagementPage";
 import AdminPanel from "./components/AdminPanel"; // Import AdminPanel
 import AnalyticsPage from "./components/AnalyticsPage"; // Import AnalyticsPage
 
@@ -35,8 +35,8 @@ const App = () => {
           element={isLoggedIn ? <LogsPage /> : <Navigate to="/" />}
         />
         <Route
-          path="/malicious-ip"
-          element={isLoggedIn ? <MaliciousIPPage /> : <Navigate to="/" />}
+          path="/ip-management"
+          element={isLoggedIn ? <IPManagementPage /> : <Navigate to="/" />}
         />
         <Route
           path="/analytics"
