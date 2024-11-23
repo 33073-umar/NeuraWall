@@ -1,6 +1,8 @@
 import os
 import subprocess
 import pandas as pd
+import numpy as np
+import joblib
 
 column_mapping = {
     "Flow Duration": "Flow Duration",
@@ -76,6 +78,56 @@ def standardize_csv(file_path, column_mapping):
     standardized_data.to_csv(file_path, index=False)
     print(f"Standardized file saved to {file_path}")
 
+# Step 4: Analyze traffic and identify malicious IPs
+def analyze_traffic_with_models(csv_file):
+    print("\n=== Step 4: Analyzing Traffic ===")
+    # Load the saved scaler, models, and selected features
+    scaler = joblib.load('scaler.joblib')
+    svm_model = joblib.load('oneclass_svm_model.joblib')
+    gb = joblib.load('gradient_boosting_model.joblib')
+    selected_features = joblib.load('selected_features.joblib')
+
+    # Threshold for Gradient Boosting
+    threshold = 0.01
+
+    # Load and preprocess the generated CSV
+    data = pd.read_csv(csv_file)
+    data.columns = data.columns.str.strip()
+    data = data.replace([np.inf, -np.inf], np.nan)
+    for col in selected_features:
+        if col in data.columns:
+            data[col] = data[col].fillna(data[col].median())
+    X_test = data[selected_features].copy()
+    X_test_scaled = scaler.transform(X_test)
+
+    # Ensure 'Src IP' column is present for tracking source IPs
+    if 'Src IP' not in data.columns:
+        raise ValueError("The required 'Src IP' column is missing in the input data.")
+
+    # Step 4.1: One-Class SVM prediction
+    svm_pred = svm_model.predict(X_test_scaled)
+    svm_pred_binary = np.where(svm_pred == -1, 1, 0)  # 1 for anomaly, 0 for benign
+
+    # Step 4.2: Combined approach - Pass SVM anomalies to Gradient Boosting
+    is_svm_anomaly = (svm_pred == -1)
+    X_gb_input = X_test_scaled[is_svm_anomaly]
+    gb_anomaly_pred = gb.predict_proba(X_gb_input)[:, 1] >= threshold
+
+    # Aggregate results
+    combined_pred = np.zeros(len(svm_pred), dtype=int)
+    combined_pred[is_svm_anomaly] = gb_anomaly_pred.astype(int)
+
+    # Count malicious packets per source IP
+    data['Malicious'] = combined_pred
+    malicious_counts = data[data['Malicious'] == 1].groupby('Src IP').size()
+
+    # Print malicious IPs with packet counts exceeding threshold
+    print("\n=== Detected Malicious IPs ===")
+    malicious_ips = malicious_counts[malicious_counts > 100]
+    if not malicious_ips.empty:
+        print(malicious_ips)
+    else:
+        print("No malicious IPs detected with more than 100 malicious packets.")
 
 # Main Execution Flow
 if __name__ == "__main__":
@@ -91,3 +143,5 @@ if __name__ == "__main__":
     # Step 3: Standardize CSV
     standardize_csv(csv_file, column_mapping)
 
+    # Step 4: Analyze Traffic
+    analyze_traffic_with_models(csv_file)
