@@ -21,12 +21,12 @@
 ## **Getting Started**
 
 ### **Prerequisites**
-- Python 3.8+
-- Node.js 14+
-- Wireshark (required for Dumpcap)
-- ReactJS
+1. Python 3.8+
+2. Node.js 14+
+3. Wireshark (required for Dumpcap). Ensure it is installed at the default location: 
+   `C:\Program Files\Wireshark`.
 
-### **Installation**
+### **Installation Steps**
 
 1. **Clone the Repository**:
    ```bash
@@ -34,43 +34,30 @@
    cd NeuraWall
    ```
 
-2. **Backend Setup**:
-   - Install Python dependencies:
+2. **Install Wireshark**:
+   - Download and install Wireshark from [https://www.wireshark.org/](https://www.wireshark.org/).
+   - Ensure it is installed at the default location (`C:\Program Files\Wireshark`).
+
+3. **Install Dependencies**:
+   - Run the `install_dependencies.py` script to automatically set up both Python and Node.js dependencies:
      ```bash
-     pip install -r backend/requirements.txt
-     ```
-   - Run the Flask server:
-     ```bash
-     python backend/app.py
+     python install_dependencies.py
      ```
 
-3. **Frontend Setup**:
-   - Navigate to the `frontend` directory:
+4. **Start NeuraWall**:
+   - Run the `start_neurawall.py` script to start all components:
      ```bash
-     cd frontend
+     python start_neurawall.py
      ```
-   - Install dependencies:
-     ```bash
-     npm install
-     ```
-   - Start the React development server:
-     ```bash
-     npm start
-     ```
-
-4. **Pipeline Setup**:
-   - The repository includes CICFlowMeter in the `pipeline` folder.
-   - Ensure Wireshark is installed for `Dumpcap` to function.
 
 ---
 
 ## **Usage**
 
 ### **Real-Time Detection**
-1. Capture network traffic using `dumpcap`.
-2. Traffic flows are automatically processed by CICFlowMeter.
-3. Analyze the traffic using the machine learning pipeline.
-4. Automatically blacklist malicious IPs or whitelist trusted ones.
+1. Automatically captures and analyzes network traffic.
+2. Blocks malicious IPs detected by AI models.
+3. Provides a GUI for monitoring and managing logs.
 
 ### **GUI Features**
 - View and filter log files.
