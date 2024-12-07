@@ -14,8 +14,13 @@ PROTOCOL_MAP = {
     # Add more mappings as needed
 }
 
-MALICIOUS_CSV_FILE_PATH = "D:\\University\\FYP\\FYP_Final\\Pipeline\\logs\\malicious_ips.csv"  # Replace with the actual path
-WHITELIST_CSV_FILE_PATH = "D:\\University\\FYP\\FYP_Final\\Pipeline\\logs\\whitelist_ips.csv"  # Path for whitelist CSV
+# Determine the base directory (where the script is located)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Construct relative paths for CSV files
+MALICIOUS_CSV_FILE_PATH = os.path.join(BASE_DIR, "../../Pipeline/logs/malicious_ips.csv")
+WHITELIST_CSV_FILE_PATH = os.path.join(BASE_DIR, "../../Pipeline/logs/whitelist_ips.csv")
+CAPTURED_TRAFFIC_CSV_FILE_PATH = os.path.join(BASE_DIR, "../../Pipeline/logs/captured_traffic.csv")
 
 # --- GET Request: Malicious IPs ---
 @app.route('/api/malicious_ips', methods=['GET'])
@@ -153,9 +158,11 @@ def remove_whitelist_ip(ip_to_remove):
 @app.route('/api/logs', methods=['GET'])
 def get_logs():
     try:
+        if not os.path.exists(CAPTURED_TRAFFIC_CSV_FILE_PATH) or os.stat(CAPTURED_TRAFFIC_CSV_FILE_PATH).st_size == 0:
+            return jsonify([])
+
         # Load the CSV file
-        csv_file_path = "D:\\University\\FYP\\FYP_Final\\Pipeline\\logs\\captured_traffic.csv"   # Replace with the actual path
-        df = pd.read_csv(csv_file_path)
+        df = pd.read_csv(CAPTURED_TRAFFIC_CSV_FILE_PATH)
 
         # Ensure the Timestamp column exists and split it
         if 'Timestamp' in df.columns:
