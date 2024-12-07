@@ -25,6 +25,7 @@
 2. Node.js 14+
 3. Wireshark (required for Dumpcap). Ensure it is installed at the default location: 
    `C:\Program Files\Wireshark`.
+4. Clone the CICFlowMeter repository as part of the setup.
 
 ### **Installation Steps**
 
@@ -38,13 +39,21 @@
    - Download and install Wireshark from [https://www.wireshark.org/](https://www.wireshark.org/).
    - Ensure it is installed at the default location (`C:\Program Files\Wireshark`).
 
-3. **Install Dependencies**:
+3. **Setup CICFlowMeter**:
+   - Clone the official CICFlowMeter repository from [here](https://github.com/CanadianInstituteForCybersecurity/CICFlowMeter):
+     ```bash
+     git clone https://github.com/CanadianInstituteForCybersecurity/CICFlowMeter.git
+     ```
+   - Copy and paste the provided `CICFlowMeter` folder from this repository into the cloned CICFlowMeter folder. Replace any existing files when prompted.
+   - Update the path for CICFlowMeter in your `Pipeline.py` script to match the location of your CICFlowMeter folder.
+
+4. **Install Dependencies**:
    - Run the `install_dependencies.py` script to automatically set up both Python and Node.js dependencies:
      ```bash
      python install_dependencies.py
      ```
 
-4. **Start NeuraWall**:
+5. **Start NeuraWall**:
    - Run the `start_neurawall.py` script to start all components:
      ```bash
      python start_neurawall.py
