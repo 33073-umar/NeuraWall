@@ -49,22 +49,32 @@ def get_ips_from_log(file_path):
 def block_ip(ip):
     """Block an IP using the firewall."""
     try:
-        run(f'netsh advfirewall firewall add rule name="{RULE_PREFIX} {ip}" dir=in action=block remoteip={ip}', shell=True, check=True, stdout=subprocess.DEVNULL)
-        run(f'netsh advfirewall firewall add rule name="{RULE_PREFIX} {ip}" dir=out action=block remoteip={ip}', shell=True, check=True, stdout=subprocess.DEVNULL)
-        print(f"Blocked IP: {ip}")
+        print(f"Attempting to block IP: {ip}")
+        run(f'netsh advfirewall firewall add rule name="{RULE_PREFIX} {ip}" dir=in action=block remoteip={ip}',
+            shell=True, check=True, stdout=subprocess.DEVNULL)
+        run(f'netsh advfirewall firewall add rule name="{RULE_PREFIX} {ip}" dir=out action=block remoteip={ip}',
+            shell=True, check=True, stdout=subprocess.DEVNULL)
+        print(f"Successfully blocked IP: {ip}")
         return True
-    except CalledProcessError:
+    except CalledProcessError as e:
+        print(f"Failed to block IP: {ip}. Error: {e}")
         return False
+
 
 def unblock_ip(ip):
     """Unblock an IP using the firewall."""
     try:
-        run(f'netsh advfirewall firewall delete rule name="{RULE_PREFIX} {ip}" dir=in', shell=True, check=True, stdout=subprocess.DEVNULL)
-        run(f'netsh advfirewall firewall delete rule name="{RULE_PREFIX} {ip}" dir=out', shell=True, check=True, stdout=subprocess.DEVNULL)
-        print(f"Unblocked IP: {ip}")
+        print(f"Attempting to unblock IP: {ip}")
+        run(f'netsh advfirewall firewall delete rule name="{RULE_PREFIX} {ip}" dir=in',
+            shell=True, check=True, stdout=subprocess.DEVNULL)
+        run(f'netsh advfirewall firewall delete rule name="{RULE_PREFIX} {ip}" dir=out',
+            shell=True, check=True, stdout=subprocess.DEVNULL)
+        print(f"Successfully unblocked IP: {ip}")
         return True
-    except CalledProcessError:
+    except CalledProcessError as e:
+        print(f"Failed to unblock IP: {ip}. Error: {e}")
         return False
+
 
 def get_ips_from_whitelist(file_path):
     """Fetch IPs from the whitelist file."""
@@ -105,30 +115,40 @@ def remove_ip_from_whitelist(ip):
 
 def update_rules():
     """Synchronize the firewall rules and log file with the CSV file."""
+    print("Updating firewall rules...")
+
+    # Load current data
     csv_ips = get_ips_from_csv(CSV_FILE_PATH)
     whitelisted_ips = get_ips_from_whitelist(WHITELIST_FILE_PATH)
     logged_ips = get_ips_from_log(LOG_FILE_PATH)
 
-    # Remove whitelisted IPs from csv_ips
+    print(f"Loaded IPs from CSV: {csv_ips}")
+    print(f"Loaded Whitelisted IPs: {whitelisted_ips}")
+    print(f"Loaded Logged IPs: {logged_ips}")
+
+    # Remove whitelisted IPs from CSV IPs
     csv_ips -= whitelisted_ips
+
+    print(f"IPs to be blocked (after removing whitelisted): {csv_ips}")
 
     # Add new rules for IPs in csv_ips but not in logged_ips
     with open(LOG_FILE_PATH, "a") as log_file:  # Append mode for new IPs
         for ip in csv_ips - logged_ips:
             if block_ip(ip):
                 log_file.write(f"{ip}\n")
+                print(f"Added rule for IP: {ip}")
 
     # Remove rules for IPs in logged_ips but not in csv_ips
     for ip in logged_ips - csv_ips:
         if unblock_ip(ip):
-            logged_ips.remove(ip)  # Remove from the logged set
+            print(f"Removed rule for IP: {ip}")
 
     # Rewrite the log file with the updated logged_ips
     with open(LOG_FILE_PATH, "w") as log_file:
         for ip in csv_ips:
             log_file.write(f"{ip}\n")
 
-    print("Firewall rules synchronized with CSV file.")
+    print("Firewall rules synchronized successfully.")
 
 # --- Watchdog Event Handler ---
 class CSVChangeHandler(FileSystemEventHandler):
