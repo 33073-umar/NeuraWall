@@ -249,7 +249,15 @@ def standardize_csv(file_path):
         standardized_data.to_csv(file_path, index=False)  # Overwrite the CSV file
     except Exception:
         pass
-
+def safe_delete(file_path, retries=5, delay=1):
+    for _ in range(retries):
+        try:
+            os.remove(file_path)
+            return True
+        except PermissionError:
+            time.sleep(delay)
+    print(f"Failed to delete {file_path} after {retries} attempts.")
+    return False
 def analyze_traffic(csv_file):
     """Analyze the traffic in the given CSV file."""
     global ip_malicious_history
@@ -351,10 +359,12 @@ def analyze_traffic(csv_file):
             data.to_csv(CAPTURED_FILE_PATH, index=False, mode="a", header=False)  # Append to existing file without header
 
         # Delete the original CSV
-        os.remove(csv_file)
+        time.sleep(0.5)
+        safe_delete(csv_file)
 
     except Exception as e:
         print(f"Error analyzing traffic: {e}")
+        safe_delete(csv_file)
 
 # --- Main Program ---
 if __name__ == "__main__":
