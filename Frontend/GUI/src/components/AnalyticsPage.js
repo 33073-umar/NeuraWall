@@ -26,7 +26,7 @@ const AnalyticsPage = () => {
   const [logs, setLogs] = useState([]); // Original logs
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [realTimeEnabled, setRealTimeEnabled] = useState(false); // Toggle for real-time updates
+  const [realTimeEnabled, setRealTimeEnabled] = useState(true); // Toggle for real-time updates
 
   const [totalPackets, setTotalPackets] = useState(0);
   const [maliciousPackets, setMaliciousPackets] = useState(0);

@@ -33,7 +33,7 @@ const LogsPage = () => {
   const [selectedColumn, setSelectedColumn] = useState("All"); // Selected column for filtering
   const [rowsPerPage, setRowsPerPage] = useState(10); // Rows per page
   const [currentPage, setCurrentPage] = useState(0); // Current page index
-  const [realTimeEnabled, setRealTimeEnabled] = useState(false); // Toggle for real-time updates
+  const [realTimeEnabled, setRealTimeEnabled] = useState(true); // Toggle for real-time updates
 
   // Fetch logs
   const fetchLogs = () => {
