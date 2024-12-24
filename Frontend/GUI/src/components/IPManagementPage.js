@@ -21,7 +21,7 @@ const IPManagementPage = () => {
   const [error, setError] = useState(null);
   const [newIP, setNewIP] = useState(""); // New IP for blacklist
   const [newWhitelistIP, setNewWhitelistIP] = useState(""); // New IP for whitelist
-  const [realTimeEnabled, setRealTimeEnabled] = useState(false); // Real-time updates
+  const [realTimeEnabled, setRealTimeEnabled] = useState(true); // Real-time updates
   const [rowsPerPage, setRowsPerPage] = useState(10); // Rows per page
   const [currentPage, setCurrentPage] = useState(0); // Current page index
   const [currentTab, setCurrentTab] = useState(0); // Tab index (0: Blacklist, 1: Whitelist)
