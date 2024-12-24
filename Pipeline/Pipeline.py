@@ -15,15 +15,40 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Base directory of the s
 OUTPUT_DIR = os.path.join(BASE_DIR, "network_capture")
 GRADLE_DIR = "D:\\University\\FYP\\FYP_Final\\Pipeline\\CICFlowMeter"  # Keep CICFlowMeter absolute
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
-os.makedirs(LOGS_DIR, exist_ok=True)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+MODEL_DIR = os.path.join(BASE_DIR, 'models')
 
+# --- Traffic Capturing Settings ---
+INTERFACE_NUMBER = 4  # Replace with your interface number
 DUMP_DURATION = 10  # Duration for each dumpcap capture
+
+# --- Detection Settings ---
+ip_malicious_history = {}  # Dictionary to track malicious flow counts per IP
+history_window = 6  # Number of CSVs to track
+flow_threshold_single = 5  # Threshold for single CSV
+flow_threshold_total = 10  # Threshold across history_window CSVs
+history_lock = threading.Lock()  # Lock for thread-safe operations
+
+# --- Firewall Settings ---
+RULE_PREFIX = "NeuraWall Rule"
+
+# --- Process Queue ---
 QUEUE = queue.Queue()  # Shared queue for pcap files
+
+# --- Paths and Files ---
 CSV_FILE_PATH = os.path.join(LOGS_DIR, "malicious_ips.csv")
 LOG_FILE_PATH = os.path.join(LOGS_DIR, "firewall_log.txt")
 WHITELIST_FILE_PATH = os.path.join(LOGS_DIR, "whitelist_ips.csv")
-RULE_PREFIX = "NeuraWall Rule"
+CAPTURED_FILE_PATH = os.path.join(LOGS_DIR, "captured_traffic.csv")
+SCALER_FILE_PATH = os.path.join(MODEL_DIR, 'scaler.joblib')
+SVM_MODEL_PATH = os.path.join(MODEL_DIR, 'oneclass_svm_model.joblib')
+GB_MODEL_PATH = os.path.join(MODEL_DIR, 'gradient_boosting_model.joblib')
+FEATURES_FILE_PATH = os.path.join(MODEL_DIR, 'selected_features.joblib')
+
+# --- Directories Setup ---
+os.makedirs(LOGS_DIR, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(MODEL_DIR, exist_ok=True)
+
 
 # --- Firewall Rule Management Functions ---
 def get_ips_from_csv(file_path):
@@ -60,7 +85,6 @@ def block_ip(ip):
         print(f"Failed to block IP: {ip}. Error: {e}")
         return False
 
-
 def unblock_ip(ip):
     """Unblock an IP using the firewall."""
     try:
@@ -74,7 +98,6 @@ def unblock_ip(ip):
     except CalledProcessError as e:
         print(f"Failed to unblock IP: {ip}. Error: {e}")
         return False
-
 
 def get_ips_from_whitelist(file_path):
     """Fetch IPs from the whitelist file."""
@@ -118,9 +141,9 @@ def update_rules():
     print("Updating firewall rules...")
 
     # Load current data
-    csv_ips = get_ips_from_csv(CSV_FILE_PATH)
+    csv_ips = get_ips_from_csv(CSV_FILE_PATH)  # Total IPs
     whitelisted_ips = get_ips_from_whitelist(WHITELIST_FILE_PATH)
-    logged_ips = get_ips_from_log(LOG_FILE_PATH)
+    logged_ips = get_ips_from_log(LOG_FILE_PATH)  # Already rule in firewall
 
     print(f"Loaded IPs from CSV: {csv_ips}")
     print(f"Loaded Whitelisted IPs: {whitelisted_ips}")
@@ -158,14 +181,14 @@ class CSVChangeHandler(FileSystemEventHandler):
             update_rules()
 
 # --- NeuraWall Real-Time Traffic Analysis Functions ---
-def capture_traffic(interface_number):
+def capture_traffic(INTERFACE_NUMBER):
     """Continuously capture traffic using dumpcap."""
     file_index = 1
     while True:
         pcap_file = os.path.join(OUTPUT_DIR, f"capture_{file_index}.pcap")
         dumpcap_command = [
             "C:\\Program Files\\Wireshark\\dumpcap.exe",  # Absolute path for dumpcap
-            "-i", str(interface_number),
+            "-i", str(INTERFACE_NUMBER),
             "-a", f"duration:{DUMP_DURATION}",
             "-w", pcap_file
         ]
@@ -229,15 +252,16 @@ def standardize_csv(file_path):
 
 def analyze_traffic(csv_file):
     """Analyze the traffic in the given CSV file."""
+    global ip_malicious_history
     try:
         # Load whitelist
         whitelisted_ips = get_ips_from_whitelist(WHITELIST_FILE_PATH)
 
         # Load models and configurations
-        scaler = joblib.load(os.path.join(BASE_DIR, 'models', 'scaler.joblib'))
-        svm_model = joblib.load(os.path.join(BASE_DIR, 'models', 'oneclass_svm_model.joblib'))
-        gb = joblib.load(os.path.join(BASE_DIR, 'models', 'gradient_boosting_model.joblib'))
-        selected_features = joblib.load(os.path.join(BASE_DIR, 'models', 'selected_features.joblib'))
+        scaler = joblib.load(SCALER_FILE_PATH)
+        svm_model = joblib.load(SVM_MODEL_PATH)
+        gb = joblib.load(GB_MODEL_PATH)
+        selected_features = joblib.load(FEATURES_FILE_PATH)
 
         threshold = 0.01  # Threshold for the gradient boosting model
 
@@ -280,24 +304,51 @@ def analyze_traffic(csv_file):
 
         # Identify malicious IPs, excluding whitelisted IPs
         malicious_packets = data[data['Label'] == "Malicious"]
-        malicious_ips = malicious_packets.groupby('Src IP').size()
+        malicious_ips_series = malicious_packets.groupby('Src IP').size()
+        malicious_ips = malicious_ips_series.to_dict()
 
         # Fetch existing malicious IPs from the CSV
         existing_ips = get_ips_from_csv(CSV_FILE_PATH)
 
-        # Append newly identified malicious IPs to the CSV
-        with open(CSV_FILE_PATH, "a") as f:
+        # Initialize a set to collect IPs to be added
+        ips_to_add = set()
+
+        with history_lock:
+            # Update ip_malicious_history
             for ip, count in malicious_ips.items():
-                if count > 100 and ip not in existing_ips:  # Log IPs that exceed threshold
-                    print(f"Malicious IP detected: {ip}")
+                if ip in ip_malicious_history:
+                    ip_malicious_history[ip].append(count)
+                else:
+                    ip_malicious_history[ip] = [count]
+                # Ensure the history window size
+                if len(ip_malicious_history[ip]) > history_window:
+                    ip_malicious_history[ip].pop(0)
+            # For IPs not in current malicious_ips, append 0
+            for ip in list(ip_malicious_history.keys()):
+                if ip not in malicious_ips:
+                    ip_malicious_history[ip].append(0)
+                    if len(ip_malicious_history[ip]) > history_window:
+                        ip_malicious_history[ip].pop(0)
+
+            # Now, check for each IP if it meets any of the blocking criteria
+            for ip, counts in ip_malicious_history.items():
+                total_count = sum(counts)
+                max_count = max(counts)
+                if (max_count > flow_threshold_single or total_count > flow_threshold_total) and ip not in existing_ips and ip not in whitelisted_ips:
+                    ips_to_add.add(ip)
+
+        # Append newly identified malicious IPs to the CSV
+        if ips_to_add:
+            with open(CSV_FILE_PATH, "a") as f:
+                for ip in ips_to_add:
+                    print(f"Malicious IP detected (stealth or threshold): {ip}")
                     f.write(f"{ip}\n")
 
         # Append all rows (labeled) to the captured_traffic.csv
-        logs_file = os.path.join(LOGS_DIR, "captured_traffic.csv")
-        if not os.path.exists(logs_file):
-            data.to_csv(logs_file, index=False, mode="w", header=True)  # Create new file with header
+        if not os.path.exists(CAPTURED_FILE_PATH):
+            data.to_csv(CAPTURED_FILE_PATH, index=False, mode="w", header=True)  # Create new file with header
         else:
-            data.to_csv(logs_file, index=False, mode="a", header=False)  # Append to existing file without header
+            data.to_csv(CAPTURED_FILE_PATH, index=False, mode="a", header=False)  # Append to existing file without header
 
         # Delete the original CSV
         os.remove(csv_file)
@@ -309,10 +360,8 @@ def analyze_traffic(csv_file):
 if __name__ == "__main__":
     print("Starting NeuraWall")
 
-    interface_number = 7  # Replace with your interface number
-
     # Start packet capture and processing threads
-    capture_thread = threading.Thread(target=capture_traffic, args=(interface_number,), daemon=True)
+    capture_thread = threading.Thread(target=capture_traffic, args=(INTERFACE_NUMBER,), daemon=True)
     process_thread = threading.Thread(target=process_pcap_to_csv, daemon=True)
     capture_thread.start()
     process_thread.start()
