@@ -1,0 +1,9 @@
+nmap 192.168.136.1  (normal)
+nmap -A 192.168.136.1 (aggressive)
+nmap -sS 192.168.136.1 (Stealth scan)
+nmap -sU -p 1-1024 192.168.136.1 (UDP scan)
+nmap -O 192.168.136.1 (OS detection)
+nmap -Pn 192.168.136.1 (Scan without ping)
+nmap -p- 192.168.136.1 (All ports scan)
+nmap -A -T4 192.168.136.1 (Fast scan)
+
