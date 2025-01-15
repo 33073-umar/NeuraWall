@@ -1,0 +1,14 @@
+Wazuh Nmap Rules
+
+<group name="linux,nmap,network_scan">
+    <!-- Detecting multiple connection attempts to different ports (possible Nmap scan) -->
+    <rule id="200409" level="10">
+        <decoded_as>json</decoded_as>
+        <field name="src_ip">.*</field> <!-- Source IP of the scanner -->
+        <field name="dst_port">.*</field> <!-- Destination port being scanned -->
+        <frequency>5</frequency>
+        <same_source_ip /> <!-- Same source IP scanning different ports -->
+        <description>Possible Port Scan Detected</description>
+        <options>no_full_log</options>
+    </rule>
+</group>
