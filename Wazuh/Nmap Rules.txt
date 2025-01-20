@@ -11,4 +11,12 @@ Wazuh Nmap Rules
         <description>Possible Port Scan Detected</description>
         <options>no_full_log</options>
     </rule>
+<!-- Nmap Aggressive Scan (-A) --> 
+    <rule id="200407" level="10">
+    <decoded_as>json</decoded_as>
+    <field name="nmap_flags">-a</field> 
+    <field name="nmap_host">\.+</field>
+    <description>Nmap Aggressive Scan (-a) Detected on Host $(nmap_host) </description>
+    <options>no_full_log</options>
+<    /rule>
 </group>
