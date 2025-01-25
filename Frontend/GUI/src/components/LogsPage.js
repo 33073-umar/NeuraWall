@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react"; 
 import {
   Box,
   Typography,
@@ -35,12 +35,17 @@ const LogsPage = () => {
   const [currentPage, setCurrentPage] = useState(0); // Current page index
   const [realTimeEnabled, setRealTimeEnabled] = useState(true); // Toggle for real-time updates
 
-  // Fetch logs
+  // --- Backend API Endpoint ---
+  const SERVER_URL = "http://192.168.1.24:5000"; // Update as needed
+  const LOGS_API = `${SERVER_URL}/api/logs`;
+
+  // --- Fetch logs ---
   const fetchLogs = () => {
     axios
-      .get("http://127.0.0.1:5000/api/logs")
+      .get(LOGS_API)
       .then((response) => {
-        const reversedLogs = response.data.reverse(); // Reverse order: latest to oldest
+        // Reverse order so the latest logs come first
+        const reversedLogs = response.data.reverse();
         setLogs(reversedLogs);
         setFilteredLogs(reversedLogs); // Display all logs initially
         setLoading(false);
@@ -55,14 +60,14 @@ const LogsPage = () => {
   useEffect(() => {
     fetchLogs(); // Initial fetch
 
-    // Real-time updates
+    // Real-time updates: refresh every 5 seconds when enabled
     let interval;
     if (realTimeEnabled) {
       interval = setInterval(() => {
         fetchLogs();
-      }, 5000); // Refresh every 5 seconds
+      }, 5000);
     }
-    return () => clearInterval(interval); // Cleanup interval on unmount or toggle off
+    return () => clearInterval(interval);
   }, [realTimeEnabled]);
 
   // Perform filtering when the search button is clicked
@@ -75,15 +80,14 @@ const LogsPage = () => {
     const filtered = logs.filter((log) => {
       const valueToSearch =
         selectedColumn === "All"
-          ? Object.values(log).join(" ") // Search across all columns
-          : log[selectedColumn] || ""; // Search in specific column
-
-      return String(valueToSearch) // Ensure it's a string
-        .toLowerCase() // Convert to lowercase for case-insensitive matching
+          ? Object.values(log).join(" ")
+          : log[selectedColumn] || "";
+      return String(valueToSearch)
+        .toLowerCase()
         .includes(tempQuery.toLowerCase());
     });
 
-    setFilteredLogs(filtered); // Update filtered logs
+    setFilteredLogs(filtered);
     setCurrentPage(0); // Reset to the first page
   };
 
@@ -94,16 +98,22 @@ const LogsPage = () => {
 
   // Handle rows per page change
   const handleRowsPerPageChange = (event) => {
-    const value = event.target.value === "All" ? filteredLogs.length : parseInt(event.target.value, 10);
+    const value =
+      event.target.value === "All"
+        ? filteredLogs.length
+        : parseInt(event.target.value, 10);
     setRowsPerPage(value);
-    setCurrentPage(0); // Reset to the first page
+    setCurrentPage(0);
   };
 
   // Get paginated logs
   const paginatedLogs =
     rowsPerPage === filteredLogs.length
       ? filteredLogs
-      : filteredLogs.slice(currentPage * rowsPerPage, currentPage * rowsPerPage + rowsPerPage);
+      : filteredLogs.slice(
+          currentPage * rowsPerPage,
+          currentPage * rowsPerPage + rowsPerPage
+        );
 
   return (
     <Box p={3} bgcolor="#f4f6f8" minHeight="100vh">
@@ -112,7 +122,11 @@ const LogsPage = () => {
       </Typography>
 
       {loading ? (
-        <CircularProgress color="primary" size={50} sx={{ display: "block", margin: "0 auto" }} />
+        <CircularProgress
+          color="primary"
+          size={50}
+          sx={{ display: "block", margin: "0 auto" }}
+        />
       ) : error ? (
         <Typography color="error" textAlign="center">
           {error}
@@ -157,8 +171,8 @@ const LogsPage = () => {
             <TextField
               label="Search Query"
               variant="outlined"
-              value={tempQuery} // Bind to tempQuery
-              onChange={(e) => setTempQuery(e.target.value)} // Update tempQuery
+              value={tempQuery}
+              onChange={(e) => setTempQuery(e.target.value)}
               sx={{ width: "50%" }}
             />
 
@@ -186,7 +200,7 @@ const LogsPage = () => {
                     <TableRow
                       key={index}
                       sx={{
-                        backgroundColor: log.Label === "Malicious" ? "#FFCCCC" : "inherit", // Red for malicious
+                        backgroundColor: log.Label === "Malicious" ? "#FFCCCC" : "inherit",
                       }}
                     >
                       <TableCell>{log.Date || "N/A"}</TableCell>
@@ -209,12 +223,12 @@ const LogsPage = () => {
               <TableFooter>
                 <TableRow>
                   <TablePagination
-                    rowsPerPageOptions={[5, 10, 25, "All"]} // Include "All" option
-                    count={filteredLogs.length} // Total filtered logs
-                    rowsPerPage={rowsPerPage} // Current rows per page
-                    page={currentPage} // Current page index
-                    onPageChange={handlePageChange} // Page change handler
-                    onRowsPerPageChange={handleRowsPerPageChange} // Rows per page change handler
+                    rowsPerPageOptions={[5, 10, 25, "All"]}
+                    count={filteredLogs.length}
+                    rowsPerPage={rowsPerPage}
+                    page={currentPage}
+                    onPageChange={handlePageChange}
+                    onRowsPerPageChange={handleRowsPerPageChange}
                   />
                 </TableRow>
               </TableFooter>

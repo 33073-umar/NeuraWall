@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react"; 
 import {
   Box,
   Typography,
@@ -15,8 +15,9 @@ import {
 import axios from "axios";
 
 const IPManagementPage = () => {
-  const [maliciousIPs, setMaliciousIPs] = useState([]); // Blacklist IPs
-  const [whitelistIPs, setWhitelistIPs] = useState([]); // Whitelist IPs
+  // For blacklist and whitelist, we'll simply store an array of IP strings.
+  const [maliciousIPs, setMaliciousIPs] = useState([]); // Blacklisted IPs
+  const [whitelistIPs, setWhitelistIPs] = useState([]); // Whitelisted IPs
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [newIP, setNewIP] = useState(""); // New IP for blacklist
@@ -27,18 +28,20 @@ const IPManagementPage = () => {
   const [currentTab, setCurrentTab] = useState(0); // Tab index (0: Blacklist, 1: Whitelist)
 
   // --- Backend API Endpoints ---
-  const BLACKLIST_API = "http://127.0.0.1:5000/api/malicious_ips";
-  const WHITELIST_API = "http://127.0.0.1:5000/api/whitelist_ips";
+  const SERVER_URL = "http://192.168.1.24:5000"; // Update as needed
+  const BLACKLIST_API = `${SERVER_URL}/api/ips/blacklist`;
+  const WHITELIST_API = `${SERVER_URL}/api/ips/whitelist`;
+  const ADD_IP_API = `${SERVER_URL}/api/ips`;
 
   // --- Fetch IPs ---
   const fetchIPs = () => {
     setLoading(true);
-
     const fetchBlacklist = axios.get(BLACKLIST_API);
     const fetchWhitelist = axios.get(WHITELIST_API);
 
     Promise.all([fetchBlacklist, fetchWhitelist])
       .then(([blacklistResponse, whitelistResponse]) => {
+        // Expecting response data as arrays of IP strings
         setMaliciousIPs(blacklistResponse.data);
         setWhitelistIPs(whitelistResponse.data);
         setLoading(false);
@@ -53,7 +56,6 @@ const IPManagementPage = () => {
   // --- Add IP ---
   const handleAddIP = (type) => {
     const newIPValue = type === "blacklist" ? newIP : newWhitelistIP;
-    const endpoint = type === "blacklist" ? BLACKLIST_API : WHITELIST_API;
 
     if (!newIPValue) {
       alert("Please enter an IP address.");
@@ -61,14 +63,15 @@ const IPManagementPage = () => {
     }
 
     axios
-      .post(endpoint, { IP: newIPValue })
+      .post(ADD_IP_API, { ip: newIPValue, list_type: type })
       .then(() => {
+        // Since the API returns simple arrays for GET calls, we update state accordingly.
         if (type === "blacklist") {
-          setMaliciousIPs((prev) => [...prev, { IP: newIPValue }]);
+          setMaliciousIPs((prev) => [...prev, newIPValue]);
           setNewIP("");
           alert("IP added to blacklist successfully.");
         } else {
-          setWhitelistIPs((prev) => [...prev, { IP: newIPValue }]);
+          setWhitelistIPs((prev) => [...prev, newIPValue]);
           setNewWhitelistIP("");
           alert("IP added to whitelist successfully.");
         }
@@ -81,15 +84,15 @@ const IPManagementPage = () => {
 
   // --- Remove IP ---
   const handleRemoveIP = (type, ip) => {
-    const endpoint = type === "blacklist" ? BLACKLIST_API : WHITELIST_API;
-
+    // For removals, we assume the delete endpoint is at /api/ips/blacklist/<ip> or /api/ips/whitelist/<ip>
+    const endpoint = type === "blacklist" ? `${BLACKLIST_API}/${ip}` : `${WHITELIST_API}/${ip}`;
     axios
-      .delete(`${endpoint}/${ip}`)
+      .delete(endpoint)
       .then(() => {
         if (type === "blacklist") {
-          setMaliciousIPs((prev) => prev.filter((ipData) => ipData.IP !== ip));
+          setMaliciousIPs((prev) => prev.filter((x) => x !== ip));
         } else {
-          setWhitelistIPs((prev) => prev.filter((ipData) => ipData.IP !== ip));
+          setWhitelistIPs((prev) => prev.filter((x) => x !== ip));
         }
         alert(`IP removed from ${type} successfully.`);
       })
@@ -113,7 +116,6 @@ const IPManagementPage = () => {
   // --- Real-Time Updates ---
   useEffect(() => {
     fetchIPs();
-
     let interval;
     if (realTimeEnabled) {
       interval = setInterval(() => {
@@ -127,10 +129,9 @@ const IPManagementPage = () => {
   const renderTable = (data, type) => {
     const paginatedIPs =
       rowsPerPage === data.length ? data : data.slice(currentPage * rowsPerPage, currentPage * rowsPerPage + rowsPerPage);
-
     return (
       <>
-        {paginatedIPs.map((ipData, index) => (
+        {paginatedIPs.map((ip, index) => (
           <Paper
             key={index}
             elevation={3}
@@ -143,13 +144,9 @@ const IPManagementPage = () => {
             }}
           >
             <Typography variant="body1" sx={{ fontWeight: "bold" }}>
-              {ipData.IP}
+              {ip}
             </Typography>
-            <Button
-              variant="contained"
-              color="success"
-              onClick={() => handleRemoveIP(type, ipData.IP)}
-            >
+            <Button variant="contained" color="success" onClick={() => handleRemoveIP(type, ip)}>
               Remove
             </Button>
           </Paper>
@@ -205,7 +202,9 @@ const IPManagementPage = () => {
           label={`Enter ${currentTab === 0 ? "Blacklist" : "Whitelist"} IP`}
           variant="outlined"
           value={currentTab === 0 ? newIP : newWhitelistIP}
-          onChange={(e) => (currentTab === 0 ? setNewIP(e.target.value) : setNewWhitelistIP(e.target.value))}
+          onChange={(e) =>
+            currentTab === 0 ? setNewIP(e.target.value) : setNewWhitelistIP(e.target.value)
+          }
           sx={{ width: "40%" }}
         />
         <Button
@@ -225,7 +224,11 @@ const IPManagementPage = () => {
           {error}
         </Typography>
       ) : currentTab === 0 ? (
-        maliciousIPs.length > 0 ? renderTable(maliciousIPs, "blacklist") : <Typography>No blacklist IPs recorded.</Typography>
+        maliciousIPs.length > 0 ? (
+          renderTable(maliciousIPs, "blacklist")
+        ) : (
+          <Typography>No blacklist IPs recorded.</Typography>
+        )
       ) : whitelistIPs.length > 0 ? (
         renderTable(whitelistIPs, "whitelist")
       ) : (
