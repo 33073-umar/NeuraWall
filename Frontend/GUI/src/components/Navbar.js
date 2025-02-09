@@ -1,6 +1,16 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { AppBar, Toolbar, Typography, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Box,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+} from "@mui/material";
 
 const Navbar = ({ isLoggedIn, setIsLoggedIn }) => {
   const [openDialog, setOpenDialog] = useState(false);
@@ -14,8 +24,8 @@ const Navbar = ({ isLoggedIn, setIsLoggedIn }) => {
   };
 
   const handleConfirmSignOut = () => {
-    setIsLoggedIn(false); // Set the login state to false when the user confirms sign-out
-    setOpenDialog(false); // Close dialog after sign-out
+    setIsLoggedIn(false);
+    setOpenDialog(false);
   };
 
   return (
@@ -34,6 +44,13 @@ const Navbar = ({ isLoggedIn, setIsLoggedIn }) => {
                 sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}
               >
                 Logs
+              </Button>
+              <Button
+                component={Link}
+                to="/wazuh-logs"
+                sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}
+              >
+                Wazuh Alerts
               </Button>
               <Button
                 component={Link}
@@ -60,7 +77,6 @@ const Navbar = ({ isLoggedIn, setIsLoggedIn }) => {
         </Box>
       </Toolbar>
 
-      {/* Confirmation Dialog */}
       <Dialog open={openDialog} onClose={handleCancelSignOut}>
         <DialogTitle>Are you sure?</DialogTitle>
         <DialogContent>

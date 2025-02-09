@@ -3,6 +3,7 @@ from flask_cors import CORS  # Import Flask-CORS
 import sqlite3
 import pandas as pd
 import os
+import json
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -162,6 +163,45 @@ def add_user():
         return jsonify({"message": f"User {username} created"}), 201
     except sqlite3.IntegrityError:
         return jsonify({"error": "Username already exists"}), 409
+
+
+LOG_JSON_PATH = "alerts.json"
+
+# ---------- GET all Wazuh logs, flattened for dashboard use ----------
+@app.route('/api/wazuh/logs', methods=['GET'])
+def get_wazuh_logs():
+    """
+    Read every line in LOG_JSON_PATH, parse it as JSON,
+    flatten to the key fields, and return as one big list.
+    """
+    try:
+        out = []
+        with open(LOG_JSON_PATH, 'r') as f:
+            for line in f:
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    # skip malformed lines
+                    continue
+
+                out.append({
+                    "id":          entry.get("id"),
+                    "timestamp":   entry.get("timestamp"),
+                    "agent":       entry.get("agent", {}).get("name"),
+                    "rule_id":     entry.get("rule", {}).get("id"),
+                    "rule_level":  entry.get("rule", {}).get("level"),
+                    "rule_desc":   entry.get("rule", {}).get("description"),
+                    "location":    entry.get("location"),
+                })
+
+        return jsonify(out), 200
+
+    except FileNotFoundError:
+        return jsonify({"error": f"Log file not found at {LOG_JSON_PATH}"}), 404
+    except Exception as e:
+        return jsonify({"error": f"Failed to read wazuh logs: {e}"}), 500
+
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
