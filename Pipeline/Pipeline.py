@@ -6,6 +6,8 @@ import subprocess
 import threading
 import queue
 import time
+import socket
+import json
 import requests  # For working with APIs
 from subprocess import run, CalledProcessError
 from watchdog.observers import Observer
@@ -17,7 +19,8 @@ OUTPUT_DIR = os.path.join(BASE_DIR, "network_capture")
 GRADLE_DIR = "D:\\University\\FYP\\FYP_Final\\Pipeline\\CICFlowMeter"  # Absolute path to CICFlowMeter
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
 MODEL_DIR = os.path.join(BASE_DIR, 'models')
-SERVER_URL = "http://192.168.1.24:5000"  # <<== Update this to your server's URL
+SERVER_URL = "http://192.168.1.12:5000"  # <<== Update this to your server's URL
+CONFIG_PATH = os.path.join(BASE_DIR, 'agent_config.json')
 
 # --- Traffic Capturing Settings ---
 INTERFACE_NUMBER = 6  # Replace with your interface number
@@ -45,57 +48,95 @@ os.makedirs(LOGS_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(MODEL_DIR, exist_ok=True)
 
+# --- Agent Identity Globals ---
+AGENT_ID = None
+HOSTNAME = socket.gethostname()
+
+
+# --- Registration Functions ---
+def register_agent():
+    """First-time registration: POST hostname, get back an agent_id."""
+    try:
+        resp = requests.post(f"{SERVER_URL}/api/register", json={"hostname": HOSTNAME})
+        resp.raise_for_status()
+        agent_id = resp.json().get("agent_id")
+        with open(CONFIG_PATH, 'w') as f:
+            json.dump({"agent_id": agent_id}, f)
+        print(f"[Agent] Registered new agent_id: {agent_id}")
+        return agent_id
+    except Exception as e:
+        print(f"[Agent] Registration failed: {e}")
+        raise SystemExit(1)
+
+def load_or_register_agent():
+    """Load agent_id from disk, or register if missing."""
+    global AGENT_ID
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, 'r') as f:
+                AGENT_ID = json.load(f).get("agent_id")
+            print(f"[Agent] Loaded agent_id: {AGENT_ID}")
+        except Exception:
+            AGENT_ID = register_agent()
+    else:
+        AGENT_ID = register_agent()
+
 
 # --- API Helper Functions ---
 def get_blacklisted_ips():
-    """Fetch blacklisted IPs from the API."""
+    """Fetch blacklisted IPs with agent metadata."""
     try:
-        response = requests.get(f"{SERVER_URL}/api/ips/blacklist")
-        if response.status_code == 200:
-            data = response.json()  # Expecting a list of IP addresses
-            return set(data)
-        else:
-            print("Failed to retrieve blacklisted IPs from server.")
+        params = {"agent_id": AGENT_ID, "hostname": HOSTNAME}
+        r = requests.get(f"{SERVER_URL}/api/ips/blacklist", params=params)
+        if r.status_code == 200:
+            return set(r.json())
+        print(f"[Agent] Failed to get blacklist: {r.status_code}")
     except Exception as e:
-        print(f"Exception in get_blacklisted_ips: {e}")
+        print(f"[Agent] Exception in get_blacklisted_ips: {e}")
     return set()
 
 def get_whitelisted_ips():
-    """Fetch whitelisted IPs from the API."""
+    """Fetch whitelisted IPs with agent metadata."""
     try:
-        response = requests.get(f"{SERVER_URL}/api/ips/whitelist")
-        if response.status_code == 200:
-            data = response.json()  # Expecting a list of IP addresses
-            return set(data)
-        else:
-            print("Failed to retrieve whitelisted IPs from server.")
+        params = {"agent_id": AGENT_ID, "hostname": HOSTNAME}
+        r = requests.get(f"{SERVER_URL}/api/ips/whitelist", params=params)
+        if r.status_code == 200:
+            return set(r.json())
+        print(f"[Agent] Failed to get whitelist: {r.status_code}")
     except Exception as e:
-        print(f"Exception in get_whitelisted_ips: {e}")
+        print(f"[Agent] Exception in get_whitelisted_ips: {e}")
     return set()
 
+
 def add_ip_to_blacklist(ip):
-    """Add an IP to the blacklist on the server."""
+    """Add IP to blacklist, tagging agent."""
     try:
-        response = requests.post(f"{SERVER_URL}/api/ips", json={"ip": ip, "list_type": "blacklist"})
-        if response.status_code in [200, 201]:
-            print(f"IP {ip} added to server blacklist.")
+        payload = {
+            "ip": ip,
+            "list_type": "blacklist",
+            "agent_id": AGENT_ID,
+            "hostname": HOSTNAME
+        }
+        r = requests.post(f"{SERVER_URL}/api/ips", json=payload)
+        if r.status_code in (200, 201):
+            print(f"[Agent] Added {ip} to server blacklist.")
             return True
-        else:
-            print(f"Failed to add IP {ip} to server blacklist. Status Code: {response.status_code}")
+        print(f"[Agent] add_ip_to_blacklist failed: {r.status_code}")
     except Exception as e:
-        print(f"Exception in add_ip_to_blacklist: {e}")
+        print(f"[Agent] Exception in add_ip_to_blacklist: {e}")
     return False
 
 def push_log(flow_data):
-    """Push a single flow log to the server."""
+    """Push one flow log, tagging agent."""
     try:
-        response = requests.post(f"{SERVER_URL}/api/logs", json=flow_data)
-        if response.status_code in [200, 201]:
-            print("Flow log pushed successfully.")
+        flow_data.update({"agent_id": AGENT_ID, "hostname": HOSTNAME})
+        r = requests.post(f"{SERVER_URL}/api/logs", json=flow_data)
+        if r.status_code in (200, 201):
+            print("[Agent] Flow log pushed.")
         else:
-            print(f"Failed to push flow log. Status Code: {response.status_code}")
+            print(f"[Agent] push_log failed: {r.status_code}")
     except Exception as e:
-        print(f"Exception in push_log: {e}")
+        print(f"[Agent] Exception in push_log: {e}")
 
 
 # --- Firewall Rule Management Functions ---
@@ -373,23 +414,20 @@ def analyze_traffic(csv_file):
 
 # --- Main Program ---
 if __name__ == "__main__":
-    print("Starting NeuraWall")
+    print("[Agent] Starting NeuraWall")
+    load_or_register_agent()
+    print(f"[Agent] Running as {AGENT_ID} ({HOSTNAME})")
 
-    # Start packet capture and processing threads
-    capture_thread = threading.Thread(target=capture_traffic, args=(INTERFACE_NUMBER,), daemon=True)
-    process_thread = threading.Thread(target=process_pcap_to_csv, daemon=True)
-    capture_thread.start()
-    process_thread.start()
+    # Threads
+    threading.Thread(target=capture_traffic, args=(INTERFACE_NUMBER,), daemon=True).start()
+    threading.Thread(target=process_pcap_to_csv, daemon=True).start()
+    threading.Thread(target=periodic_update_rules, daemon=True).start()
 
-    # Start periodic firewall rules update thread
-    rules_update_thread = threading.Thread(target=periodic_update_rules, daemon=True)
-    rules_update_thread.start()
-
-    # Initial synchronization of firewall rules
+    # Initial sync
     update_rules()
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("Stopping NeuraWall.")
+        print("[Agent] Shutting down.")
