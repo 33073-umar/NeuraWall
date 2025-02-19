@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"; 
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Typography,
@@ -24,19 +24,19 @@ import {
 import axios from "axios";
 
 const LogsPage = () => {
-  const [logs, setLogs] = useState([]); // Original logs
-  const [filteredLogs, setFilteredLogs] = useState([]); // Filtered logs
+  const [logs, setLogs] = useState([]);
+  const [filteredLogs, setFilteredLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchQuery, setSearchQuery] = useState(""); // Current query in search bar
-  const [tempQuery, setTempQuery] = useState(""); // Temporary input query
-  const [selectedColumn, setSelectedColumn] = useState("All"); // Selected column for filtering
-  const [rowsPerPage, setRowsPerPage] = useState(10); // Rows per page
-  const [currentPage, setCurrentPage] = useState(0); // Current page index
-  const [realTimeEnabled, setRealTimeEnabled] = useState(true); // Toggle for real-time updates
+  const [searchQuery, setSearchQuery] = useState("");
+  const [tempQuery, setTempQuery] = useState("");
+  const [selectedColumn, setSelectedColumn] = useState("All");
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [realTimeEnabled, setRealTimeEnabled] = useState(true);
 
   // --- Backend API Endpoint ---
-  const SERVER_URL = "http://192.168.1.24:5000"; // Update as needed
+  const SERVER_URL = process.env.REACT_APP_SERVER_URL;
   const LOGS_API = `${SERVER_URL}/api/logs`;
 
   // --- Fetch logs ---
@@ -44,10 +44,9 @@ const LogsPage = () => {
     axios
       .get(LOGS_API)
       .then((response) => {
-        // Reverse order so the latest logs come first
         const reversedLogs = response.data.reverse();
         setLogs(reversedLogs);
-        setFilteredLogs(reversedLogs); // Display all logs initially
+        setFilteredLogs(reversedLogs);
         setLoading(false);
       })
       .catch((error) => {
@@ -58,22 +57,17 @@ const LogsPage = () => {
   };
 
   useEffect(() => {
-    fetchLogs(); // Initial fetch
-
-    // Real-time updates: refresh every 5 seconds when enabled
+    fetchLogs();
     let interval;
     if (realTimeEnabled) {
-      interval = setInterval(() => {
-        fetchLogs();
-      }, 5000);
+      interval = setInterval(fetchLogs, 5000);
     }
     return () => clearInterval(interval);
   }, [realTimeEnabled]);
 
-  // Perform filtering when the search button is clicked
   const handleSearch = () => {
     if (!tempQuery) {
-      setFilteredLogs(logs); // Reset to original logs if query is empty
+      setFilteredLogs(logs);
       return;
     }
 
@@ -88,15 +82,13 @@ const LogsPage = () => {
     });
 
     setFilteredLogs(filtered);
-    setCurrentPage(0); // Reset to the first page
+    setCurrentPage(0);
   };
 
-  // Handle page change
   const handlePageChange = (_, newPage) => {
     setCurrentPage(newPage);
   };
 
-  // Handle rows per page change
   const handleRowsPerPageChange = (event) => {
     const value =
       event.target.value === "All"
@@ -106,7 +98,6 @@ const LogsPage = () => {
     setCurrentPage(0);
   };
 
-  // Get paginated logs
   const paginatedLogs =
     rowsPerPage === filteredLogs.length
       ? filteredLogs
@@ -122,18 +113,13 @@ const LogsPage = () => {
       </Typography>
 
       {loading ? (
-        <CircularProgress
-          color="primary"
-          size={50}
-          sx={{ display: "block", margin: "0 auto" }}
-        />
+        <CircularProgress color="primary" size={50} sx={{ display: "block", margin: "0 auto" }} />
       ) : error ? (
         <Typography color="error" textAlign="center">
           {error}
         </Typography>
       ) : (
         <>
-          {/* Real-Time Toggle */}
           <Box mb={3} display="flex" justifyContent="flex-end" pr={5}>
             <FormControlLabel
               control={
@@ -147,7 +133,6 @@ const LogsPage = () => {
             />
           </Box>
 
-          {/* Search Controls */}
           <Box mb={3} display="flex" justifyContent="center" gap={2}>
             <FormControl sx={{ width: "20%" }}>
               <InputLabel id="search-column-label">Search Column</InputLabel>
@@ -160,6 +145,7 @@ const LogsPage = () => {
                 <MenuItem value="All">All</MenuItem>
                 <MenuItem value="Date">Date</MenuItem>
                 <MenuItem value="Time">Time</MenuItem>
+                <MenuItem value="Agent">Agent</MenuItem>
                 <MenuItem value="Src IP">Src IP</MenuItem>
                 <MenuItem value="Src Port">Src Port</MenuItem>
                 <MenuItem value="Dst IP">Dst IP</MenuItem>
@@ -187,6 +173,7 @@ const LogsPage = () => {
                 <TableRow>
                   <TableCell><strong>Date</strong></TableCell>
                   <TableCell><strong>Time</strong></TableCell>
+                  <TableCell><strong>Agent</strong></TableCell>
                   <TableCell><strong>Src IP</strong></TableCell>
                   <TableCell><strong>Src Port</strong></TableCell>
                   <TableCell><strong>Dst IP</strong></TableCell>
@@ -205,6 +192,7 @@ const LogsPage = () => {
                     >
                       <TableCell>{log.Date || "N/A"}</TableCell>
                       <TableCell>{log.Time || "N/A"}</TableCell>
+                      <TableCell>{log.Agent || "N/A"}</TableCell>
                       <TableCell>{log["Src IP"] || "N/A"}</TableCell>
                       <TableCell>{log["Src Port"] || "N/A"}</TableCell>
                       <TableCell>{log["Dst IP"] || "N/A"}</TableCell>
@@ -214,7 +202,7 @@ const LogsPage = () => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} align="center">
+                    <TableCell colSpan={8} align="center">
                       No logs match your search query.
                     </TableCell>
                   </TableRow>

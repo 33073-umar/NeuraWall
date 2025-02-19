@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"; 
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Typography,
@@ -15,33 +15,38 @@ import {
 import axios from "axios";
 
 const IPManagementPage = () => {
-  // For blacklist and whitelist, we'll simply store an array of IP strings.
-  const [maliciousIPs, setMaliciousIPs] = useState([]); // Blacklisted IPs
-  const [whitelistIPs, setWhitelistIPs] = useState([]); // Whitelisted IPs
+  const AGENT = localStorage.getItem("username") || "unknown";
+  const HOSTNAME = "server_frontend";
+
+  const [maliciousIPs, setMaliciousIPs] = useState([]);
+  const [whitelistIPs, setWhitelistIPs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [newIP, setNewIP] = useState(""); // New IP for blacklist
-  const [newWhitelistIP, setNewWhitelistIP] = useState(""); // New IP for whitelist
-  const [realTimeEnabled, setRealTimeEnabled] = useState(true); // Real-time updates
-  const [rowsPerPage, setRowsPerPage] = useState(10); // Rows per page
-  const [currentPage, setCurrentPage] = useState(0); // Current page index
-  const [currentTab, setCurrentTab] = useState(0); // Tab index (0: Blacklist, 1: Whitelist)
+  const [newIP, setNewIP] = useState("");
+  const [newWhitelistIP, setNewWhitelistIP] = useState("");
+  const [realTimeEnabled, setRealTimeEnabled] = useState(true);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [currentTab, setCurrentTab] = useState(0);
 
-  // --- Backend API Endpoints ---
-  const SERVER_URL = "http://192.168.1.24:5000"; // Update as needed
+  const SERVER_URL = process.env.REACT_APP_SERVER_URL;
   const BLACKLIST_API = `${SERVER_URL}/api/ips/blacklist`;
   const WHITELIST_API = `${SERVER_URL}/api/ips/whitelist`;
   const ADD_IP_API = `${SERVER_URL}/api/ips`;
 
-  // --- Fetch IPs ---
   const fetchIPs = () => {
     setLoading(true);
-    const fetchBlacklist = axios.get(BLACKLIST_API);
-    const fetchWhitelist = axios.get(WHITELIST_API);
+
+    const params = {
+      agent_id: AGENT,
+      hostname: HOSTNAME,
+    };
+
+    const fetchBlacklist = axios.get(BLACKLIST_API, { params });
+    const fetchWhitelist = axios.get(WHITELIST_API, { params });
 
     Promise.all([fetchBlacklist, fetchWhitelist])
       .then(([blacklistResponse, whitelistResponse]) => {
-        // Expecting response data as arrays of IP strings
         setMaliciousIPs(blacklistResponse.data);
         setWhitelistIPs(whitelistResponse.data);
         setLoading(false);
@@ -53,7 +58,6 @@ const IPManagementPage = () => {
       });
   };
 
-  // --- Add IP ---
   const handleAddIP = (type) => {
     const newIPValue = type === "blacklist" ? newIP : newWhitelistIP;
 
@@ -62,10 +66,16 @@ const IPManagementPage = () => {
       return;
     }
 
+    const body = {
+      ip: newIPValue,
+      list_type: type,
+      agent_id: AGENT,
+      hostname: HOSTNAME,
+    };
+
     axios
-      .post(ADD_IP_API, { ip: newIPValue, list_type: type })
+      .post(ADD_IP_API, body)
       .then(() => {
-        // Since the API returns simple arrays for GET calls, we update state accordingly.
         if (type === "blacklist") {
           setMaliciousIPs((prev) => [...prev, newIPValue]);
           setNewIP("");
@@ -82,12 +92,17 @@ const IPManagementPage = () => {
       });
   };
 
-  // --- Remove IP ---
   const handleRemoveIP = (type, ip) => {
-    // For removals, we assume the delete endpoint is at /api/ips/blacklist/<ip> or /api/ips/whitelist/<ip>
-    const endpoint = type === "blacklist" ? `${BLACKLIST_API}/${ip}` : `${WHITELIST_API}/${ip}`;
+    const endpoint =
+      type === "blacklist" ? `${BLACKLIST_API}/${ip}` : `${WHITELIST_API}/${ip}`;
+
+    const params = {
+      agent_id: AGENT,
+      hostname: HOSTNAME,
+    };
+
     axios
-      .delete(endpoint)
+      .delete(endpoint, { params })
       .then(() => {
         if (type === "blacklist") {
           setMaliciousIPs((prev) => prev.filter((x) => x !== ip));
@@ -102,33 +117,35 @@ const IPManagementPage = () => {
       });
   };
 
-  // --- Pagination ---
   const handlePageChange = (_, newPage) => {
     setCurrentPage(newPage);
   };
 
   const handleRowsPerPageChange = (event) => {
-    const value = event.target.value === "All" ? maliciousIPs.length : parseInt(event.target.value, 10);
+    const value =
+      event.target.value === "All"
+        ? maliciousIPs.length
+        : parseInt(event.target.value, 10);
     setRowsPerPage(value);
-    setCurrentPage(0); // Reset to the first page
+    setCurrentPage(0);
   };
 
-  // --- Real-Time Updates ---
   useEffect(() => {
     fetchIPs();
     let interval;
     if (realTimeEnabled) {
       interval = setInterval(() => {
         fetchIPs();
-      }, 5000); // Refresh every 5 seconds
+      }, 5000);
     }
     return () => clearInterval(interval);
   }, [realTimeEnabled]);
 
-  // --- Render Table ---
   const renderTable = (data, type) => {
     const paginatedIPs =
-      rowsPerPage === data.length ? data : data.slice(currentPage * rowsPerPage, currentPage * rowsPerPage + rowsPerPage);
+      rowsPerPage === data.length
+        ? data
+        : data.slice(currentPage * rowsPerPage, currentPage * rowsPerPage + rowsPerPage);
     return (
       <>
         {paginatedIPs.map((ip, index) => (
@@ -146,7 +163,11 @@ const IPManagementPage = () => {
             <Typography variant="body1" sx={{ fontWeight: "bold" }}>
               {ip}
             </Typography>
-            <Button variant="contained" color="success" onClick={() => handleRemoveIP(type, ip)}>
+            <Button
+              variant="contained"
+              color="success"
+              onClick={() => handleRemoveIP(type, ip)}
+            >
               Remove
             </Button>
           </Paper>
@@ -171,7 +192,6 @@ const IPManagementPage = () => {
         IP Management
       </Typography>
 
-      {/* Real-Time Toggle */}
       <Box mb={3} display="flex" justifyContent="flex-end" pr={5}>
         <FormControlLabel
           control={
@@ -185,7 +205,6 @@ const IPManagementPage = () => {
         />
       </Box>
 
-      {/* Tabs for Blacklist and Whitelist */}
       <Tabs
         value={currentTab}
         onChange={(_, newValue) => setCurrentTab(newValue)}
@@ -196,8 +215,13 @@ const IPManagementPage = () => {
         <Tab label="Whitelist" />
       </Tabs>
 
-      {/* Add IP Form */}
-      <Box mb={3} display="flex" justifyContent="center" alignItems="center" gap={2}>
+      <Box
+        mb={3}
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        gap={2}
+      >
         <TextField
           label={`Enter ${currentTab === 0 ? "Blacklist" : "Whitelist"} IP`}
           variant="outlined"
@@ -210,15 +234,20 @@ const IPManagementPage = () => {
         <Button
           variant="contained"
           color={currentTab === 0 ? "error" : "primary"}
-          onClick={() => handleAddIP(currentTab === 0 ? "blacklist" : "whitelist")}
+          onClick={() =>
+            handleAddIP(currentTab === 0 ? "blacklist" : "whitelist")
+          }
         >
           Add to {currentTab === 0 ? "Blacklist" : "Whitelist"}
         </Button>
       </Box>
 
-      {/* Display Table */}
       {loading ? (
-        <CircularProgress color="primary" size={50} sx={{ display: "block", margin: "0 auto" }} />
+        <CircularProgress
+          color="primary"
+          size={50}
+          sx={{ display: "block", margin: "0 auto" }}
+        />
       ) : error ? (
         <Typography color="error" textAlign="center">
           {error}

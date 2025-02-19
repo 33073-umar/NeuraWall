@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Box, Typography, TextField, Button } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 const LoginPage = ({ setIsLoggedIn }) => {
   const [username, setUsername] = useState("");
@@ -8,13 +9,25 @@ const LoginPage = ({ setIsLoggedIn }) => {
   const navigate = useNavigate();
 
   const handleLogin = () => {
-    // Here you would perform real authentication
-    if (username === "admin" && password === "admin") {
-      setIsLoggedIn(true);
-      navigate("/logs"); // Redirect to logs page after successful login
-    } else {
-      alert("Invalid credentials");
-    }
+    axios
+      .post(`${process.env.REACT_APP_SERVER_URL}/api/login`, { username, password })
+      .then((res) => {
+        const { username: user, role } = res.data;
+        // Save user info for later
+        localStorage.setItem("username", user);
+        localStorage.setItem("role", role);
+
+        // Set basic auth header for future requests
+        const token = btoa(`${username}:${password}`);
+        axios.defaults.headers.common["Authorization"] = `Basic ${token}`;
+
+        setIsLoggedIn(true);
+        navigate("/logs");
+      })
+      .catch((err) => {
+        console.error("Login failed", err);
+        alert("Invalid credentials");
+      });
   };
 
   return (

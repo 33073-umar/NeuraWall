@@ -36,7 +36,7 @@ const WazuhLogsPage = () => {
   const [realTimeEnabled, setRealTimeEnabled] = useState(true);
 
   // Backend endpoint
-  const SERVER_URL = "http://192.168.1.24:5000";
+  const SERVER_URL = process.env.REACT_APP_SERVER_URL;
   const WAZUH_API = `${SERVER_URL}/api/wazuh/logs`;
 
   // Fetch Wazuh logs

@@ -7,7 +7,8 @@ import IPManagementPage from "./components/IPManagementPage";
 import AdminPanel from "./components/AdminPanel";
 import AnalyticsPage from "./components/AnalyticsPage";
 import GlobalAlert from "./components/GlobalAlert";
-import WazuhLogsPage from "./components/WazuhLogsPage";  // Import the new Wazuh logs page
+import WazuhLogsPage from "./components/WazuhLogsPage";
+import AgentsPage from "./components/AgentsPage";  // Import the new Agents page
 
 const App = () => {
   // Check if user is already logged in by checking localStorage
@@ -43,25 +44,24 @@ const App = () => {
         />
         <Route
           path="/wazuh-logs"
-          element={
-            isLoggedIn ? <WazuhLogsPage /> : <Navigate to="/" />
-          }
+          element={isLoggedIn ? <WazuhLogsPage /> : <Navigate to="/" />}
         />
         <Route
           path="/ip-management"
-          element={
-            isLoggedIn ? <IPManagementPage /> : <Navigate to="/" />
-          }
+          element={isLoggedIn ? <IPManagementPage /> : <Navigate to="/" />}
         />
         <Route
           path="/analytics"
-          element={
-            isLoggedIn ? <AnalyticsPage /> : <Navigate to="/" />
-          }
+          element={isLoggedIn ? <AnalyticsPage /> : <Navigate to="/" />}
         />
         <Route
           path="/admin"
           element={isLoggedIn ? <AdminPanel /> : <Navigate to="/" />}
+        />
+        {/* New Agents Route */}
+        <Route
+          path="/agents"
+          element={isLoggedIn ? <AgentsPage /> : <Navigate to="/" />}
         />
 
         {/* Redirect all others to login */}

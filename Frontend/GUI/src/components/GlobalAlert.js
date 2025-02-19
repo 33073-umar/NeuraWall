@@ -1,8 +1,7 @@
-// src/components/GlobalAlert.js
 import React, { useEffect, useRef, useState } from "react";
 import { Snackbar, Alert } from "@mui/material";
 
-const SERVER_URL    = "http://192.168.1.24:5000";  // your Flask host
+const SERVER_URL    = process.env.REACT_APP_SERVER_URL;  // your Flask host
 const BLACKLIST_API = `${SERVER_URL}/api/ips/blacklist`;
 
 export default function GlobalAlert() {
@@ -10,12 +9,19 @@ export default function GlobalAlert() {
   const [open, setOpen] = useState(false);
   const [msg, setMsg]   = useState("");
 
+  const AGENT    = localStorage.getItem("username") || "unknown";
+  const HOSTNAME = "server_frontend";
+
   useEffect(() => {
     let mounted = true;
 
     async function poll() {
       try {
-        const res     = await fetch(BLACKLIST_API);
+        const url = new URL(BLACKLIST_API);
+        url.searchParams.append("agent_id", AGENT);
+        url.searchParams.append("hostname", HOSTNAME);
+
+        const res     = await fetch(url.toString());
         const current = await res.json();
         if (!Array.isArray(current)) return;
 

@@ -67,6 +67,13 @@ const Navbar = ({ isLoggedIn, setIsLoggedIn }) => {
                 Analytics
               </Button>
               <Button
+                component={Link}
+                to="/agents"
+                sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}
+              >
+                Agents
+              </Button>
+              <Button
                 onClick={handleOpenDialog}
                 sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}
               >
