@@ -16,6 +16,7 @@ import {
   MenuItem,
   Switch,
   FormControlLabel,
+  Button,
 } from "@mui/material";
 import axios from "axios";
 
@@ -28,6 +29,7 @@ const AgentsPage = () => {
 
   const SERVER_URL = process.env.REACT_APP_SERVER_URL;
   const AGENTS_API = `${SERVER_URL}/api/agents`;
+  const TOGGLE_API = (id) => `${SERVER_URL}/api/agents/${id}/active`;
 
   const fetchAgents = () => {
     axios
@@ -52,16 +54,21 @@ const AgentsPage = () => {
     return () => clearInterval(interval);
   }, [realTime]);
 
-  // derive counts
   const total = agents.length;
-  const onlineCount = agents.filter(a => a.status === 'online').length;
+  const onlineCount = agents.filter((a) => a.status === "online").length;
   const offlineCount = total - onlineCount;
 
-  // filtering
   const displayed =
     filter === "All"
       ? agents
       : agents.filter((a) => a.status === filter.toLowerCase());
+
+  const toggleActive = (agent_id, current) => {
+    axios
+      .patch(TOGGLE_API(agent_id), { is_active: !current })
+      .then(() => fetchAgents())
+      .catch((err) => console.error("Failed to toggle active:", err));
+  };
 
   return (
     <Box p={3} bgcolor="#f4f6f8" minHeight="100vh">
@@ -70,13 +77,13 @@ const AgentsPage = () => {
       </Typography>
 
       {loading ? (
-        <CircularProgress size={50} sx={{ display: 'block', mx: 'auto', my: 5 }} />
+        <CircularProgress size={50} sx={{ display: "block", mx: "auto", my: 5 }} />
       ) : error ? (
         <Typography color="error" textAlign="center">
           {error}
         </Typography>
       ) : (
-        <>          
+        <>
           {/* Summary */}
           <Box display="flex" justifyContent="space-around" mb={3}>
             <Box textAlign="center">
@@ -121,14 +128,20 @@ const AgentsPage = () => {
           </Box>
 
           {/* Agents Table */}
-          <TableContainer component={Paper} sx={{ maxWidth: '90%', mx: 'auto' }}>
-            <Table>
+          <TableContainer component={Paper} sx={{ maxWidth: "95%", mx: "auto" }}>
+            <Table size="small">
               <TableHead>
                 <TableRow>
                   <TableCell><strong>Agent ID</strong></TableCell>
                   <TableCell><strong>Hostname</strong></TableCell>
-                  <TableCell><strong>Last Seen</strong></TableCell>
                   <TableCell><strong>Status</strong></TableCell>
+                  <TableCell><strong>Last Seen</strong></TableCell>
+                  <TableCell><strong>OS</strong></TableCell>
+                  <TableCell><strong>IP</strong></TableCell>
+                  <TableCell><strong>MAC</strong></TableCell>
+                  <TableCell><strong>Processor</strong></TableCell>
+                  <TableCell><strong>CPU Cores</strong></TableCell>
+                  <TableCell><strong>Active</strong></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -136,13 +149,28 @@ const AgentsPage = () => {
                   <TableRow key={agent.agent_id}>
                     <TableCell>{agent.agent_id}</TableCell>
                     <TableCell>{agent.hostname}</TableCell>
+                    <TableCell sx={{ textTransform: "capitalize" }}>{agent.status}</TableCell>
                     <TableCell>{new Date(agent.last_seen).toLocaleString()}</TableCell>
-                    <TableCell sx={{ textTransform: 'capitalize' }}>{agent.status}</TableCell>
+                    <TableCell>{agent.os} {agent.os_version}</TableCell>
+                    <TableCell>{agent.ip_address}</TableCell>
+                    <TableCell>{agent.mac_address}</TableCell>
+                    <TableCell>{agent.processor}</TableCell>
+                    <TableCell>{agent.cpu_count} cores</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => toggleActive(agent.agent_id, agent.is_active)}
+                        color={agent.is_active ? "success" : "error"}
+                      >
+                        {agent.is_active ? "Deactivate" : "Activate"}
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
                 {displayed.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={4} align="center">
+                    <TableCell colSpan={10} align="center">
                       No agents to display.
                     </TableCell>
                   </TableRow>
