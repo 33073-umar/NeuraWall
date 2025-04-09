@@ -20,7 +20,7 @@ const LoginPage = ({ setIsLoggedIn }) => {
         // Set basic auth header for future requests
         const token = btoa(`${username}:${password}`);
         axios.defaults.headers.common["Authorization"] = `Basic ${token}`;
-
+        localStorage.setItem("authToken", token);
         setIsLoggedIn(true);
         navigate("/logs");
       })
