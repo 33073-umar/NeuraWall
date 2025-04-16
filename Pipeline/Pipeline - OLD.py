@@ -18,7 +18,7 @@ LOGS_DIR = os.path.join(BASE_DIR, "logs")
 MODEL_DIR = os.path.join(BASE_DIR, 'models')
 
 # --- Traffic Capturing Settings ---
-INTERFACE_NUMBER = 7  # Replace with your interface number
+INTERFACE_NUMBER = 6  # Replace with your interface number
 DUMP_DURATION = 10  # Duration for each dumpcap capture
 
 # --- Detection Settings ---
