@@ -36,52 +36,33 @@ const Navbar = ({ isLoggedIn, setIsLoggedIn }) => {
         </Typography>
 
         <Box display="flex" gap={2}>
-          {isLoggedIn && (
-            <>
-              <Button
-                component={Link}
-                to="/logs"
-                sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}
-              >
-                Logs
-              </Button>
-              <Button
-                component={Link}
-                to="/wazuh-logs"
-                sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}
-              >
-                Wazuh Alerts
-              </Button>
-              <Button
-                component={Link}
-                to="/ip-management"
-                sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}
-              >
-                IP Management
-              </Button>
-              <Button
-                component={Link}
-                to="/analytics"
-                sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}
-              >
-                Analytics
-              </Button>
-              <Button
-                component={Link}
-                to="/agents"
-                sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}
-              >
-                Agents
-              </Button>
-              <Button
-                onClick={handleOpenDialog}
-                sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}
-              >
-                Sign Out
-              </Button>
-            </>
-          )}
-        </Box>
+  {isLoggedIn && (
+    <>
+      <Button component={Link} to="/logs" sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}>
+        Logs
+      </Button>
+      <Button component={Link} to="/wazuh-logs" sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}>
+        Wazuh Alerts
+      </Button>
+      <Button component={Link} to="/ip-management" sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}>
+        IP Management
+      </Button>
+      <Button component={Link} to="/analytics" sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}>
+        Analytics
+      </Button>
+      <Button component={Link} to="/agents" sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}>
+        Agents
+      </Button>
+      <Button component={Link} to="/user-management" sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}>
+        User Management
+      </Button>
+      <Button onClick={handleOpenDialog} sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}>
+        Sign Out
+      </Button>
+    </>
+  )}
+</Box>
+
       </Toolbar>
 
       <Dialog open={openDialog} onClose={handleCancelSignOut}>
