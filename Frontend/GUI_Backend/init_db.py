@@ -7,10 +7,16 @@ cursor = conn.cursor()
 # ─── Agents Table ─────────────────────────────────────────────────────────────
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS agents (
-    agent_id   TEXT PRIMARY KEY,
-    hostname   TEXT    NOT NULL,
-    last_seen  TEXT
-)
+    agent_id     TEXT    PRIMARY KEY,
+    hostname     TEXT    NOT NULL,
+    os           TEXT    NOT NULL,
+    os_version   TEXT    NOT NULL,
+    machine_guid TEXT    NOT NULL,
+    mac_address  TEXT    NOT NULL,
+    agent_version TEXT   NOT NULL,
+    aes_key      BLOB    NOT NULL,
+    last_seen    TEXT
+);
 """)
 
 # ─── IP Lists Table ───────────────────────────────────────────────────────────

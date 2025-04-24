@@ -224,6 +224,21 @@ def get_logs():
         print(f"Error in GET /api/logs: {e}")
         return jsonify({"error": "Failed to process logs"}), 500
 
+@app.route('/api/logs_full', methods=['GET'])
+def get_logs():
+    try:
+        conn = get_db_connection()
+        cursor = conn.execute(
+            'SELECT * FROM logs ORDER BY timestamp DESC LIMIT 1000'
+        )
+        rows = cursor.fetchall()
+        conn.close()
+
+        # convert rows to dicts
+        logs = [dict(row) for row in rows]
+        return jsonify(logs), 200
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch logs: {e}'}), 500
 
 # ─── Agents Endpoints ─────────────────────────────────────────────────────────
 @app.route('/api/agents', methods=['GET'])
