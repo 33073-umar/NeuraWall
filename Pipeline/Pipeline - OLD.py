@@ -6,6 +6,9 @@ import subprocess
 import threading
 import queue
 import time
+import socket
+import json
+import requests  # For working with APIs
 from subprocess import run, CalledProcessError
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -13,9 +16,11 @@ from watchdog.events import FileSystemEventHandler
 # --- Configuration ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Base directory of the script
 OUTPUT_DIR = os.path.join(BASE_DIR, "network_capture")
-GRADLE_DIR = "D:\\University\\FYP\\FYP_Final\\Pipeline\\CICFlowMeter"  # Keep CICFlowMeter absolute
+GRADLE_DIR = "D:\\University\\FYP\\FYP_Final\\Pipeline\\CICFlowMeter"  # Absolute path to CICFlowMeter
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
 MODEL_DIR = os.path.join(BASE_DIR, 'models')
+SERVER_URL = "http://192.168.1.12:5000"  # <<== Update this to your server's URL
+CONFIG_PATH = os.path.join(BASE_DIR, 'agent_config.json')
 
 # --- Traffic Capturing Settings ---
 INTERFACE_NUMBER = 6  # Replace with your interface number
@@ -23,54 +28,119 @@ DUMP_DURATION = 10  # Duration for each dumpcap capture
 
 # --- Detection Settings ---
 ip_malicious_history = {}  # Dictionary to track malicious flow counts per IP
-history_window = 6  # Number of CSVs to track
-flow_threshold_single = 5  # Threshold for single CSV
-flow_threshold_total = 10  # Threshold across history_window CSVs
+history_window = 6  # Number of dumps to track
+flow_threshold_single = 5  # Threshold for a single dump
+flow_threshold_total = 10  # Threshold across history_window dumps
 history_lock = threading.Lock()  # Lock for thread-safe operations
 
 # --- Firewall Settings ---
 RULE_PREFIX = "NeuraWall Rule"
+RULES_UPDATE_INTERVAL = 10  # Seconds interval for periodically updating firewall rules
 
 # --- Process Queue ---
 QUEUE = queue.Queue()  # Shared queue for pcap files
 
-# --- Paths and Files ---
-CSV_FILE_PATH = os.path.join(LOGS_DIR, "malicious_ips.csv")
+# --- Files ---
 LOG_FILE_PATH = os.path.join(LOGS_DIR, "firewall_log.txt")
-WHITELIST_FILE_PATH = os.path.join(LOGS_DIR, "whitelist_ips.csv")
-CAPTURED_FILE_PATH = os.path.join(LOGS_DIR, "captured_traffic.csv")
-SCALER_FILE_PATH = os.path.join(MODEL_DIR, 'scaler.joblib')
-SVM_MODEL_PATH = os.path.join(MODEL_DIR, 'oneclass_svm_model.joblib')
-GB_MODEL_PATH = os.path.join(MODEL_DIR, 'gradient_boosting_model.joblib')
-FEATURES_FILE_PATH = os.path.join(MODEL_DIR, 'selected_features.joblib')
 
 # --- Directories Setup ---
 os.makedirs(LOGS_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(MODEL_DIR, exist_ok=True)
 
+# --- Agent Identity Globals ---
+AGENT_ID = None
+HOSTNAME = socket.gethostname()
+CONFIG_PATH = os.path.join(BASE_DIR, "agent_config.bin")
+KEY_PATH = os.path.join(BASE_DIR, "agent_key.bin")
+
+# --- Registration Functions ---
+def register_agent():
+    """First-time registration: POST hostname, get back an agent_id."""
+    try:
+        resp = requests.post(f"{SERVER_URL}/api/register", json={"hostname": HOSTNAME})
+        resp.raise_for_status()
+        agent_id = resp.json().get("agent_id")
+        with open(CONFIG_PATH, 'w') as f:
+            json.dump({"agent_id": agent_id}, f)
+        print(f"[Agent] Registered new agent_id: {agent_id}")
+        return agent_id
+    except Exception as e:
+        print(f"[Agent] Registration failed: {e}")
+        raise SystemExit(1)
+
+def load_or_register_agent():
+    """Load agent_id from disk, or register if missing."""
+    global AGENT_ID
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, 'r') as f:
+                AGENT_ID = json.load(f).get("agent_id")
+            print(f"[Agent] Loaded agent_id: {AGENT_ID}")
+        except Exception:
+            AGENT_ID = register_agent()
+    else:
+        AGENT_ID = register_agent()
+
+
+# --- API Helper Functions ---
+def get_blacklisted_ips():
+    """Fetch blacklisted IPs with agent metadata."""
+    try:
+        params = {"agent_id": AGENT_ID, "hostname": HOSTNAME}
+        r = requests.get(f"{SERVER_URL}/api/ips/blacklist", params=params)
+        if r.status_code == 200:
+            return set(r.json())
+        print(f"[Agent] Failed to get blacklist: {r.status_code}")
+    except Exception as e:
+        print(f"[Agent] Exception in get_blacklisted_ips: {e}")
+    return set()
+
+def get_whitelisted_ips():
+    """Fetch whitelisted IPs with agent metadata."""
+    try:
+        params = {"agent_id": AGENT_ID, "hostname": HOSTNAME}
+        r = requests.get(f"{SERVER_URL}/api/ips/whitelist", params=params)
+        if r.status_code == 200:
+            return set(r.json())
+        print(f"[Agent] Failed to get whitelist: {r.status_code}")
+    except Exception as e:
+        print(f"[Agent] Exception in get_whitelisted_ips: {e}")
+    return set()
+
+
+def add_ip_to_blacklist(ip):
+    """Add IP to blacklist, tagging agent."""
+    try:
+        payload = {
+            "ip": ip,
+            "list_type": "blacklist",
+            "agent_id": AGENT_ID,
+            "hostname": HOSTNAME
+        }
+        r = requests.post(f"{SERVER_URL}/api/ips", json=payload)
+        if r.status_code in (200, 201):
+            print(f"[Agent] Added {ip} to server blacklist.")
+            return True
+        print(f"[Agent] add_ip_to_blacklist failed: {r.status_code}")
+    except Exception as e:
+        print(f"[Agent] Exception in add_ip_to_blacklist: {e}")
+    return False
+
+def push_log(flow_data):
+    """Push one flow log, tagging agent."""
+    try:
+        flow_data.update({"agent_id": AGENT_ID, "hostname": HOSTNAME})
+        r = requests.post(f"{SERVER_URL}/api/logs", json=flow_data)
+        if r.status_code in (200, 201):
+            print("[Agent] Flow log pushed.")
+        else:
+            print(f"[Agent] push_log failed: {r.status_code}")
+    except Exception as e:
+        print(f"[Agent] Exception in push_log: {e}")
+
 
 # --- Firewall Rule Management Functions ---
-def get_ips_from_csv(file_path):
-    """Fetch IPs from the CSV file."""
-    if not os.path.exists(file_path) or os.stat(file_path).st_size == 0:
-        return set()
-    try:
-        df = pd.read_csv(file_path, header=None)
-        return set(df[0].dropna())
-    except Exception:
-        return set()  # Return an empty set if the file cannot be parsed or is empty
-
-def get_ips_from_log(file_path):
-    """Fetch IPs from the log file."""
-    if not os.path.exists(file_path):
-        return set()
-    try:
-        with open(file_path, "r") as log_file:
-            return set(line.strip() for line in log_file if line.strip())
-    except Exception:
-        return set()  # Return an empty set if the log file cannot be read
-
 def block_ip(ip):
     """Block an IP using the firewall."""
     try:
@@ -99,113 +169,92 @@ def unblock_ip(ip):
         print(f"Failed to unblock IP: {ip}. Error: {e}")
         return False
 
-def get_ips_from_whitelist(file_path):
-    """Fetch IPs from the whitelist file."""
-    if not os.path.exists(file_path) or os.stat(file_path).st_size == 0:
-        return set()
-    try:
-        df = pd.read_csv(file_path, header=None)
-        return set(df[0].dropna())
-    except Exception:
-        return set()  # Return an empty set if the file cannot be parsed or is empty
-
-def add_ip_to_whitelist(ip):
-    """Add an IP to the whitelist."""
-    existing_ips = get_ips_from_whitelist(WHITELIST_FILE_PATH)
-    if ip in existing_ips:
-        print(f"IP {ip} is already whitelisted.")
-        return False
-    try:
-        with open(WHITELIST_FILE_PATH, "a") as f:
-            f.write(f"{ip}\n")
-        print(f"Added IP {ip} to whitelist.")
-        return True
-    except Exception as e:
-        print(f"Error adding IP to whitelist: {e}")
-        return False
-
-def remove_ip_from_whitelist(ip):
-    """Remove an IP from the whitelist."""
-    try:
-        df = pd.read_csv(WHITELIST_FILE_PATH, header=None)
-        df = df[df[0] != ip]
-        df.to_csv(WHITELIST_FILE_PATH, index=False, header=False)
-        print(f"Removed IP {ip} from whitelist.")
-        return True
-    except Exception as e:
-        print(f"Error removing IP from whitelist: {e}")
-        return False
-
 def update_rules():
-    """Synchronize the firewall rules and log file with the CSV file."""
+    """Synchronize the firewall rules with the server's blacklisted IPs."""
     print("Updating firewall rules...")
 
-    # Load current data
-    csv_ips = get_ips_from_csv(CSV_FILE_PATH)  # Total IPs
-    whitelisted_ips = get_ips_from_whitelist(WHITELIST_FILE_PATH)
-    logged_ips = get_ips_from_log(LOG_FILE_PATH)  # Already rule in firewall
+    # Retrieve current data from the server
+    blacklisted_ips = get_blacklisted_ips()
+    whitelisted_ips = get_whitelisted_ips()
 
-    print(f"Loaded IPs from CSV: {csv_ips}")
-    print(f"Loaded Whitelisted IPs: {whitelisted_ips}")
-    print(f"Loaded Logged IPs: {logged_ips}")
+    # Read local log file for currently applied firewall rules (if it exists)
+    if os.path.exists(LOG_FILE_PATH):
+        try:
+            with open(LOG_FILE_PATH, "r") as log_file:
+                logged_ips = set(line.strip() for line in log_file if line.strip())
+        except Exception:
+            logged_ips = set()
+    else:
+        logged_ips = set()
 
-    # Remove whitelisted IPs from CSV IPs
-    csv_ips -= whitelisted_ips
+    print(f"Blacklisted IPs from server: {blacklisted_ips}")
+    print(f"Whitelisted IPs from server: {whitelisted_ips}")
+    print(f"Currently logged (blocked) IPs: {logged_ips}")
 
-    print(f"IPs to be blocked (after removing whitelisted): {csv_ips}")
+    # Remove whitelisted IPs from the block list
+    ips_to_block = blacklisted_ips - whitelisted_ips
 
-    # Add new rules for IPs in csv_ips but not in logged_ips
-    with open(LOG_FILE_PATH, "a") as log_file:  # Append mode for new IPs
-        for ip in csv_ips - logged_ips:
+    # Add new firewall rules for IPs not yet blocked
+    with open(LOG_FILE_PATH, "a") as log_file:
+        for ip in ips_to_block - logged_ips:
             if block_ip(ip):
                 log_file.write(f"{ip}\n")
-                print(f"Added rule for IP: {ip}")
+                print(f"Added firewall rule for IP: {ip}")
 
-    # Remove rules for IPs in logged_ips but not in csv_ips
-    for ip in logged_ips - csv_ips:
+    # Remove firewall rules for IPs that are no longer blacklisted
+    for ip in logged_ips - ips_to_block:
         if unblock_ip(ip):
-            print(f"Removed rule for IP: {ip}")
+            print(f"Removed firewall rule for IP: {ip}")
 
-    # Rewrite the log file with the updated logged_ips
+    # Rewrite the log file with the updated set of blocked IPs
     with open(LOG_FILE_PATH, "w") as log_file:
-        for ip in csv_ips:
+        for ip in ips_to_block:
             log_file.write(f"{ip}\n")
 
     print("Firewall rules synchronized successfully.")
 
+def periodic_update_rules():
+    """Periodically update the firewall rules by fetching the latest lists from the server."""
+    while True:
+        update_rules()
+        time.sleep(RULES_UPDATE_INTERVAL)
+
+
 # --- Watchdog Event Handler ---
 class CSVChangeHandler(FileSystemEventHandler):
     def on_modified(self, event):
-        if event.src_path.endswith(CSV_FILE_PATH):
-            print("CSV file modified. Updating rules...")
-            update_rules()
+        # This handler is no longer used to update rules from a CSV.
+        # Rules are now managed via API calls.
+        pass
+
 
 # --- NeuraWall Real-Time Traffic Analysis Functions ---
-def capture_traffic(INTERFACE_NUMBER):
+def capture_traffic(interface_number):
     """Continuously capture traffic using dumpcap."""
     file_index = 1
     while True:
         pcap_file = os.path.join(OUTPUT_DIR, f"capture_{file_index}.pcap")
         dumpcap_command = [
             "C:\\Program Files\\Wireshark\\dumpcap.exe",  # Absolute path for dumpcap
-            "-i", str(INTERFACE_NUMBER),
+            "-i", str(interface_number),
             "-a", f"duration:{DUMP_DURATION}",
             "-w", pcap_file
         ]
         try:
             subprocess.run(dumpcap_command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-            QUEUE.put(pcap_file)  # Add new pcap file to queue
+            QUEUE.put(pcap_file)  # Add new pcap file to processing queue
             file_index += 1
         except subprocess.CalledProcessError:
             pass
 
 def process_pcap_to_csv():
-    """Continuously process pcap files to CSV."""
+    """Continuously process pcap files to generate flows and analyze traffic."""
     while True:
         try:
-            pcap_file = QUEUE.get()  # Wait for new pcap file
+            pcap_file = QUEUE.get()  # Wait for a new pcap file
             base_name = os.path.basename(pcap_file)
-            csv_file = os.path.join(OUTPUT_DIR, f"{base_name}_flows.csv")  # Expected output file from CICFlowMeter
+            csv_file = os.path.join(OUTPUT_DIR, f"{base_name}_flows.csv")  # Output file from CICFlowMeter
+
             gradle_command = [
                 os.path.join(GRADLE_DIR, "gradlew.bat"),
                 "executePcapToCsvCli",
@@ -217,8 +266,8 @@ def process_pcap_to_csv():
                     gradle_command, cwd=GRADLE_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
                 )
                 standardize_csv(csv_file)  # Standardize the CSV
-                analyze_traffic(csv_file)  # Analyze traffic
-                os.remove(pcap_file)  # Delete processed .pcap file
+                analyze_traffic(csv_file)  # Analyze traffic and push flows/logs via API
+                os.remove(pcap_file)  # Delete processed pcap file
             except subprocess.CalledProcessError:
                 pass
         except Exception:
@@ -246,10 +295,12 @@ def standardize_csv(file_path):
         data = pd.read_csv(file_path)
         data.columns = data.columns.str.strip()  # Remove whitespace from column names
         standardized_data = data.rename(columns=column_mapping)
-        standardized_data.to_csv(file_path, index=False)  # Overwrite the CSV file
+        standardized_data.to_csv(file_path, index=False)  # Overwrite CSV with standardized columns
     except Exception:
         pass
+
 def safe_delete(file_path, retries=5, delay=1):
+    """Safely delete a file with retries."""
     for _ in range(retries):
         try:
             os.remove(file_path)
@@ -258,18 +309,19 @@ def safe_delete(file_path, retries=5, delay=1):
             time.sleep(delay)
     print(f"Failed to delete {file_path} after {retries} attempts.")
     return False
+
 def analyze_traffic(csv_file):
-    """Analyze the traffic in the given CSV file."""
+    """Analyze the traffic in the given CSV file and push flows to the server."""
     global ip_malicious_history
     try:
-        # Load whitelist
-        whitelisted_ips = get_ips_from_whitelist(WHITELIST_FILE_PATH)
+        # Load whitelisted IPs from the API
+        whitelisted_ips = get_whitelisted_ips()
 
         # Load models and configurations
-        scaler = joblib.load(SCALER_FILE_PATH)
-        svm_model = joblib.load(SVM_MODEL_PATH)
-        gb = joblib.load(GB_MODEL_PATH)
-        selected_features = joblib.load(FEATURES_FILE_PATH)
+        scaler = joblib.load(os.path.join(MODEL_DIR, 'scaler.joblib'))
+        svm_model = joblib.load(os.path.join(MODEL_DIR, 'oneclass_svm_model.joblib'))
+        gb = joblib.load(os.path.join(MODEL_DIR, 'gradient_boosting_model.joblib'))
+        selected_features = joblib.load(os.path.join(MODEL_DIR, 'selected_features.joblib'))
 
         threshold = 0.01  # Threshold for the gradient boosting model
 
@@ -288,14 +340,13 @@ def analyze_traffic(csv_file):
         # Only apply anomaly detection to traffic with "No Label"
         non_whitelisted_data = data[data['Label'] == "No Label"]
 
-        # Check if non-whitelisted data is empty
         if non_whitelisted_data.empty:
             print("No non-whitelisted traffic to analyze.")
         else:
             X_test = non_whitelisted_data[selected_features].copy()
             X_test_scaled = scaler.transform(X_test)
 
-            # Ensure the required columns exist
+            # Ensure required columns exist
             required_columns = ['Flow ID', 'Src IP', 'Src Port', 'Dst IP', 'Dst Port', 'Protocol', 'Timestamp']
             if not all(col in data.columns for col in required_columns):
                 raise ValueError("Missing required columns in CSV.")
@@ -310,55 +361,50 @@ def analyze_traffic(csv_file):
             combined_pred[is_svm_anomaly] = gb_anomaly_pred.astype(int)
             data.loc[non_whitelisted_data.index, 'Label'] = np.where(combined_pred == 1, "Malicious", "Benign")
 
-        # Identify malicious IPs, excluding whitelisted IPs
+        # Identify malicious IPs (excluding whitelisted)
         malicious_packets = data[data['Label'] == "Malicious"]
         malicious_ips_series = malicious_packets.groupby('Src IP').size()
         malicious_ips = malicious_ips_series.to_dict()
 
-        # Fetch existing malicious IPs from the CSV
-        existing_ips = get_ips_from_csv(CSV_FILE_PATH)
+        # Retrieve existing blacklisted IPs from the server
+        existing_ips = get_blacklisted_ips()
 
-        # Initialize a set to collect IPs to be added
         ips_to_add = set()
 
         with history_lock:
-            # Update ip_malicious_history
+            # Update ip_malicious_history with current counts
             for ip, count in malicious_ips.items():
                 if ip in ip_malicious_history:
                     ip_malicious_history[ip].append(count)
                 else:
                     ip_malicious_history[ip] = [count]
-                # Ensure the history window size
                 if len(ip_malicious_history[ip]) > history_window:
                     ip_malicious_history[ip].pop(0)
-            # For IPs not in current malicious_ips, append 0
+            # Append 0 for IPs not present in current malicious_ips
             for ip in list(ip_malicious_history.keys()):
                 if ip not in malicious_ips:
                     ip_malicious_history[ip].append(0)
                     if len(ip_malicious_history[ip]) > history_window:
                         ip_malicious_history[ip].pop(0)
 
-            # Now, check for each IP if it meets any of the blocking criteria
+            # Evaluate each IP against the blocking criteria
             for ip, counts in ip_malicious_history.items():
                 total_count = sum(counts)
                 max_count = max(counts)
                 if (max_count > flow_threshold_single or total_count > flow_threshold_total) and ip not in existing_ips and ip not in whitelisted_ips:
                     ips_to_add.add(ip)
 
-        # Append newly identified malicious IPs to the CSV
-        if ips_to_add:
-            with open(CSV_FILE_PATH, "a") as f:
-                for ip in ips_to_add:
-                    print(f"Malicious IP detected (stealth or threshold): {ip}")
-                    f.write(f"{ip}\n")
+        # For each new malicious IP, push it to the server blacklist via API
+        for ip in ips_to_add:
+            print(f"Malicious IP detected (threshold exceeded): {ip}")
+            add_ip_to_blacklist(ip)
 
-        # Append all rows (labeled) to the captured_traffic.csv
-        if not os.path.exists(CAPTURED_FILE_PATH):
-            data.to_csv(CAPTURED_FILE_PATH, index=False, mode="w", header=True)  # Create new file with header
-        else:
-            data.to_csv(CAPTURED_FILE_PATH, index=False, mode="a", header=False)  # Append to existing file without header
+        # Push each flow (each row) to the server as a log
+        for _, row in data.iterrows():
+            flow_data = row.to_dict()
+            push_log(flow_data)
 
-        # Delete the original CSV
+        # Delete the temporary CSV file produced by CICFlowMeter
         time.sleep(0.5)
         safe_delete(csv_file)
 
@@ -366,27 +412,23 @@ def analyze_traffic(csv_file):
         print(f"Error analyzing traffic: {e}")
         safe_delete(csv_file)
 
+
 # --- Main Program ---
 if __name__ == "__main__":
-    print("Starting NeuraWall")
+    print("[Agent] Starting NeuraWall")
+    load_or_register_agent()
+    print(f"[Agent] Running as {AGENT_ID} ({HOSTNAME})")
 
-    # Start packet capture and processing threads
-    capture_thread = threading.Thread(target=capture_traffic, args=(INTERFACE_NUMBER,), daemon=True)
-    process_thread = threading.Thread(target=process_pcap_to_csv, daemon=True)
-    capture_thread.start()
-    process_thread.start()
+    # Threads
+    threading.Thread(target=capture_traffic, args=(INTERFACE_NUMBER,), daemon=True).start()
+    threading.Thread(target=process_pcap_to_csv, daemon=True).start()
+    threading.Thread(target=periodic_update_rules, daemon=True).start()
 
-    # Set up firewall monitoring
-    update_rules()  # Initial synchronization
-    event_handler = CSVChangeHandler()
-    observer = Observer()
-    observer.schedule(event_handler, path=LOGS_DIR, recursive=False)
-    observer.start()
+    # Initial sync
+    update_rules()
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("Stopping NeuraWall.")
-        observer.stop()
-    observer.join()
+        print("[Agent] Shutting down.")

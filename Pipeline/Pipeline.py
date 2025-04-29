@@ -12,6 +12,10 @@ import requests  # For working with APIs
 from subprocess import run, CalledProcessError
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+import platform
+import uuid
+import psutil
+
 
 # --- Configuration ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Base directory of the script
@@ -19,8 +23,9 @@ OUTPUT_DIR = os.path.join(BASE_DIR, "network_capture")
 GRADLE_DIR = "D:\\University\\FYP\\FYP_Final\\Pipeline\\CICFlowMeter"  # Absolute path to CICFlowMeter
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
 MODEL_DIR = os.path.join(BASE_DIR, 'models')
-SERVER_URL = "http://192.168.1.12:5000"  # <<== Update this to your server's URL
+SERVER_URL = "https://192.168.1.14:5000"  # <<== Update this to your server's URL
 CONFIG_PATH = os.path.join(BASE_DIR, 'agent_config.json')
+CERT_PATH = os.path.join(BASE_DIR, "server.crt")
 
 # --- Traffic Capturing Settings ---
 INTERFACE_NUMBER = 6  # Replace with your interface number
@@ -52,12 +57,70 @@ os.makedirs(MODEL_DIR, exist_ok=True)
 AGENT_ID = None
 HOSTNAME = socket.gethostname()
 
+# --- Metadata Collection ---
+def collect_metadata():
+    """Collects detailed system metadata for registration."""
+    try:
+        system_info = {
+            "hostname": HOSTNAME,
+            "os": platform.system(),
+            "os_version": platform.version(),
+            "platform": platform.platform(),
+            "architecture": platform.machine(),
+            "processor": platform.processor(),
+            "cpu_count": psutil.cpu_count(logical=True),
+            "mac_address": get_mac_address(),
+            "ip_address": get_local_ip(),
+            "python_version": platform.python_version(),
+            "auth_token": "super-secret-123"
+        }
+        print(system_info)
+        return system_info
+    except Exception as e:
+        print(f"[Agent] Metadata collection failed: {e}")
+        return {}
+
+def get_mac_address():
+    """Returns MAC address of the primary network adapter."""
+    mac = uuid.getnode()
+    return ':'.join(['{:02x}'.format((mac >> ele) & 0xff) for ele in range(40, -8, -8)])
+
+def get_local_ip():
+    """Returns local IP address."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "Unavailable"
 
 # --- Registration Functions ---
-def register_agent():
-    """First-time registration: POST hostname, get back an agent_id."""
+def validate_agent(agent_id):
     try:
-        resp = requests.post(f"{SERVER_URL}/api/register", json={"hostname": HOSTNAME})
+        resp = requests.post(
+            f"{SERVER_URL}/api/validate",
+            json={"agent_id": agent_id},
+            verify=CERT_PATH
+        )
+        if resp.status_code == 200:
+            return True
+        print("[Agent] Validation failed:", resp.json().get("error"))
+        return False
+    except Exception as e:
+        print(f"[Agent] Validation error: {e}")
+        return False
+
+def register_agent():
+    """First-time registration: POST metadata, get back an agent_id."""
+    metadata = collect_metadata()
+    try:
+        resp = requests.post(
+            f"{SERVER_URL}/api/register",
+            json=metadata,
+            verify=CERT_PATH
+        )
         resp.raise_for_status()
         agent_id = resp.json().get("agent_id")
         with open(CONFIG_PATH, 'w') as f:
@@ -69,17 +132,23 @@ def register_agent():
         raise SystemExit(1)
 
 def load_or_register_agent():
-    """Load agent_id from disk, or register if missing."""
     global AGENT_ID
     if os.path.exists(CONFIG_PATH):
         try:
             with open(CONFIG_PATH, 'r') as f:
                 AGENT_ID = json.load(f).get("agent_id")
             print(f"[Agent] Loaded agent_id: {AGENT_ID}")
+            if not validate_agent(AGENT_ID):
+                print("[Agent] This agent is blocked or invalid. Contact admin.")
+                raise SystemExit(1)
         except Exception:
             AGENT_ID = register_agent()
     else:
         AGENT_ID = register_agent()
+        if not validate_agent(AGENT_ID):
+            print("[Agent] Registered but not active. Contact admin.")
+            raise SystemExit(1)
+
 
 
 # --- API Helper Functions ---
@@ -87,7 +156,11 @@ def get_blacklisted_ips():
     """Fetch blacklisted IPs with agent metadata."""
     try:
         params = {"agent_id": AGENT_ID, "hostname": HOSTNAME}
-        r = requests.get(f"{SERVER_URL}/api/ips/blacklist", params=params)
+        r = requests.get(
+            f"{SERVER_URL}/api/ips/blacklist",
+            params=params,
+            verify=CERT_PATH  # ← Add this
+        )
         if r.status_code == 200:
             return set(r.json())
         print(f"[Agent] Failed to get blacklist: {r.status_code}")
@@ -99,13 +172,18 @@ def get_whitelisted_ips():
     """Fetch whitelisted IPs with agent metadata."""
     try:
         params = {"agent_id": AGENT_ID, "hostname": HOSTNAME}
-        r = requests.get(f"{SERVER_URL}/api/ips/whitelist", params=params)
+        r = requests.get(
+            f"{SERVER_URL}/api/ips/whitelist",
+            params=params,
+            verify=CERT_PATH  # ← Add this
+        )
         if r.status_code == 200:
             return set(r.json())
         print(f"[Agent] Failed to get whitelist: {r.status_code}")
     except Exception as e:
         print(f"[Agent] Exception in get_whitelisted_ips: {e}")
     return set()
+
 
 
 def add_ip_to_blacklist(ip):
@@ -117,7 +195,11 @@ def add_ip_to_blacklist(ip):
             "agent_id": AGENT_ID,
             "hostname": HOSTNAME
         }
-        r = requests.post(f"{SERVER_URL}/api/ips", json=payload)
+        r = requests.post(
+            f"{SERVER_URL}/api/ips",
+            json=payload,
+            verify=CERT_PATH
+        )
         if r.status_code in (200, 201):
             print(f"[Agent] Added {ip} to server blacklist.")
             return True
@@ -130,7 +212,11 @@ def push_log(flow_data):
     """Push one flow log, tagging agent."""
     try:
         flow_data.update({"agent_id": AGENT_ID, "hostname": HOSTNAME})
-        r = requests.post(f"{SERVER_URL}/api/logs", json=flow_data)
+        r = requests.post(
+            f"{SERVER_URL}/api/logs",
+            json=flow_data,
+            verify=CERT_PATH
+        )
         if r.status_code in (200, 201):
             print("[Agent] Flow log pushed.")
         else:
