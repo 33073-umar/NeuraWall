@@ -1,0 +1,14 @@
+# 1) Generate private key
+openssl genrsa -out server.key 2048
+
+# 2) Create CSR using the san.cnf
+openssl req -new -key server.key -out server.csr -config san.cnf
+
+# 3) Self-sign the CSR, embedding the SAN extension
+openssl x509 -req \
+  -in server.csr \
+  -signkey server.key \
+  -out server.crt \
+  -days 365 \
+  -extensions v3_req \
+  -extfile san.cnf
