@@ -14,6 +14,7 @@ import {
 
 const Navbar = ({ isLoggedIn, setIsLoggedIn }) => {
   const [openDialog, setOpenDialog] = useState(false);
+  const role = localStorage.getItem("role"); // get lowercase role: "admin" or "watcher"
 
   const handleOpenDialog = () => {
     setOpenDialog(true);
@@ -36,33 +37,37 @@ const Navbar = ({ isLoggedIn, setIsLoggedIn }) => {
         </Typography>
 
         <Box display="flex" gap={2}>
-  {isLoggedIn && (
-    <>
-      <Button component={Link} to="/logs" sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}>
-        Logs
-      </Button>
-      <Button component={Link} to="/wazuh-logs" sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}>
-        Wazuh Alerts
-      </Button>
-      <Button component={Link} to="/ip-management" sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}>
-        IP Management
-      </Button>
-      <Button component={Link} to="/analytics" sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}>
-        Analytics
-      </Button>
-      <Button component={Link} to="/agents" sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}>
-        Agents
-      </Button>
-      <Button component={Link} to="/user-management" sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}>
-        User Management
-      </Button>
-      <Button onClick={handleOpenDialog} sx={{ color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#f50057" } }}>
-        Sign Out
-      </Button>
-    </>
-  )}
-</Box>
+          {isLoggedIn && (
+            <>
+              <Button component={Link} to="/logs" sx={navBtnStyle}>
+                Logs
+              </Button>
+              <Button component={Link} to="/wazuh-logs" sx={navBtnStyle}>
+                Wazuh Alerts
+              </Button>
+              <Button component={Link} to="/ip-management" sx={navBtnStyle}>
+                IP Management
+              </Button>
+              <Button component={Link} to="/analytics" sx={navBtnStyle}>
+                Analytics
+              </Button>
+              <Button component={Link} to="/agents" sx={navBtnStyle}>
+                Agents
+              </Button>
 
+              {/* ✅ Only show this for "admin" */}
+              {role === "admin" && (
+                <Button component={Link} to="/user-management" sx={navBtnStyle}>
+                  User Management
+                </Button>
+              )}
+
+              <Button onClick={handleOpenDialog} sx={navBtnStyle}>
+                Sign Out
+              </Button>
+            </>
+          )}
+        </Box>
       </Toolbar>
 
       <Dialog open={openDialog} onClose={handleCancelSignOut}>
@@ -81,6 +86,12 @@ const Navbar = ({ isLoggedIn, setIsLoggedIn }) => {
       </Dialog>
     </AppBar>
   );
+};
+
+const navBtnStyle = {
+  color: "#fff",
+  textTransform: "none",
+  "&:hover": { bgcolor: "#f50057" },
 };
 
 export default Navbar;

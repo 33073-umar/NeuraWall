@@ -31,6 +31,9 @@ const AgentsPage = () => {
   const AGENTS_API = `${SERVER_URL}/api/agents`;
   const TOGGLE_API = (id) => `${SERVER_URL}/api/agents/${id}/active`;
 
+  const role = localStorage.getItem("role"); // "admin" or "watcher"
+
+
   const fetchAgents = () => {
     axios
       .get(AGENTS_API)
@@ -141,7 +144,8 @@ const AgentsPage = () => {
                   <TableCell><strong>MAC</strong></TableCell>
                   <TableCell><strong>Processor</strong></TableCell>
                   <TableCell><strong>CPU Cores</strong></TableCell>
-                  <TableCell><strong>Active</strong></TableCell>
+                  {role === "admin" && <TableCell><strong>Active</strong></TableCell>}
+
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -156,16 +160,19 @@ const AgentsPage = () => {
                     <TableCell>{agent.mac_address}</TableCell>
                     <TableCell>{agent.processor}</TableCell>
                     <TableCell>{agent.cpu_count} cores</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="contained"
-                        size="small"
-                        onClick={() => toggleActive(agent.agent_id, agent.is_active)}
-                        color={agent.is_active ? "success" : "error"}
-                      >
-                        {agent.is_active ? "Deactivate" : "Activate"}
-                      </Button>
-                    </TableCell>
+                    {role === "admin" && (
+  <TableCell>
+    <Button
+      variant="contained"
+      size="small"
+      onClick={() => toggleActive(agent.agent_id, agent.is_active)}
+      color={agent.is_active ? "success" : "error"}
+    >
+      {agent.is_active ? "Deactivate" : "Activate"}
+    </Button>
+  </TableCell>
+)}
+
                   </TableRow>
                 ))}
                 {displayed.length === 0 && (

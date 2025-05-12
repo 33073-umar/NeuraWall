@@ -34,6 +34,8 @@ const IPManagementPage = () => {
   const WHITELIST_API = `${SERVER_URL}/api/ips/whitelist`;
   const ADD_IP_API = `${SERVER_URL}/api/ips`;
 
+  const role = localStorage.getItem("role"); // "admin" or "watcher"
+  console.log(role);
   const fetchIPs = () => {
     setLoading(true);
 
@@ -163,13 +165,16 @@ const IPManagementPage = () => {
             <Typography variant="body1" sx={{ fontWeight: "bold" }}>
               {ip}
             </Typography>
-            <Button
-              variant="contained"
-              color="success"
-              onClick={() => handleRemoveIP(type, ip)}
-            >
-              Remove
-            </Button>
+            {role === "admin" && (
+  <Button
+    variant="contained"
+    color="success"
+    onClick={() => handleRemoveIP(type, ip)}
+  >
+    Remove
+  </Button>
+)}
+
           </Paper>
         ))}
         <Box display="flex" justifyContent="center" mt={3}>
@@ -215,32 +220,35 @@ const IPManagementPage = () => {
         <Tab label="Whitelist" />
       </Tabs>
 
-      <Box
-        mb={3}
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        gap={2}
-      >
-        <TextField
-          label={`Enter ${currentTab === 0 ? "Blacklist" : "Whitelist"} IP`}
-          variant="outlined"
-          value={currentTab === 0 ? newIP : newWhitelistIP}
-          onChange={(e) =>
-            currentTab === 0 ? setNewIP(e.target.value) : setNewWhitelistIP(e.target.value)
-          }
-          sx={{ width: "40%" }}
-        />
-        <Button
-          variant="contained"
-          color={currentTab === 0 ? "error" : "primary"}
-          onClick={() =>
-            handleAddIP(currentTab === 0 ? "blacklist" : "whitelist")
-          }
-        >
-          Add to {currentTab === 0 ? "Blacklist" : "Whitelist"}
-        </Button>
-      </Box>
+      {role === "admin" && (
+  <Box
+    mb={3}
+    display="flex"
+    justifyContent="center"
+    alignItems="center"
+    gap={2}
+  >
+    <TextField
+      label={`Enter ${currentTab === 0 ? "Blacklist" : "Whitelist"} IP`}
+      variant="outlined"
+      value={currentTab === 0 ? newIP : newWhitelistIP}
+      onChange={(e) =>
+        currentTab === 0 ? setNewIP(e.target.value) : setNewWhitelistIP(e.target.value)
+      }
+      sx={{ width: "40%" }}
+    />
+    <Button
+      variant="contained"
+      color={currentTab === 0 ? "error" : "primary"}
+      onClick={() =>
+        handleAddIP(currentTab === 0 ? "blacklist" : "whitelist")
+      }
+    >
+      Add to {currentTab === 0 ? "Blacklist" : "Whitelist"}
+    </Button>
+  </Box>
+)}
+
 
       {loading ? (
         <CircularProgress

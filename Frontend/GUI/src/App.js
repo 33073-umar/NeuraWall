@@ -13,7 +13,6 @@ import IPManagementPage from "./components/IPManagementPage";
 import AnalyticsPage from "./components/AnalyticsPage";
 import WazuhLogsPage from "./components/WazuhLogsPage";
 import AgentsPage from "./components/AgentsPage";
-import AdminPanel from "./components/AdminPanel";
 import GlobalAlert from "./components/GlobalAlert";
 
 // ← Import your new page
@@ -23,6 +22,7 @@ const AppContent = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(
     localStorage.getItem("isLoggedIn") === "true"
   );
+  const [userRole, setUserRole] = useState(localStorage.getItem("role")); // e.g. "Admin" or "Watcher"
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -44,7 +44,6 @@ const AppContent = () => {
       )}
 
       <Routes>
-        {/* Public route */}
         <Route
           path="/"
           element={
@@ -55,57 +54,49 @@ const AppContent = () => {
             )
           }
         />
-
-        {/* Protected routes */}
         <Route
           path="/logs"
           element={isLoggedIn ? <LogsPage /> : <Navigate to="/" replace />}
         />
         <Route
           path="/wazuh-logs"
-          element={
-            isLoggedIn ? <WazuhLogsPage /> : <Navigate to="/" replace />
-          }
+          element={isLoggedIn ? <WazuhLogsPage /> : <Navigate to="/" replace />}
         />
         <Route
           path="/ip-management"
-          element={
-            isLoggedIn ? <IPManagementPage /> : <Navigate to="/" replace />
-          }
+          element={isLoggedIn ? <IPManagementPage /> : <Navigate to="/" replace />}
         />
         <Route
           path="/analytics"
-          element={
-            isLoggedIn ? <AnalyticsPage /> : <Navigate to="/" replace />
-          }
+          element={isLoggedIn ? <AnalyticsPage /> : <Navigate to="/" replace />}
         />
         <Route
           path="/agents"
           element={isLoggedIn ? <AgentsPage /> : <Navigate to="/" replace />}
         />
-        <Route
-          path="/admin"
-          element={isLoggedIn ? <AdminPanel /> : <Navigate to="/" replace />}
-        />
 
-        {/* ← New User Management route */}
+        {/* ✅ Role-based protected route */}
         <Route
           path="/user-management"
           element={
             isLoggedIn ? (
-              <UserManagementPage />
+              userRole === "admin" ? (
+                <UserManagementPage />
+              ) : (
+                <Navigate to="/logs" replace />
+              )
             ) : (
               <Navigate to="/" replace />
             )
           }
         />
 
-        {/* Catch‑all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );
 };
+
 
 export default function App() {
   return (
