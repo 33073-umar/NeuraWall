@@ -1,1 +1,100 @@
-VPN Client Configuration
+General Information
+Description
+Neurawall-VPN for Remote Access
+ 
+Unique VPN ID = Client 2 (ovpnc2)
+
+Mode Configuration
+Server mode
+Peer to Peer ( SSL/TLS )
+
+Device mode
+tun - Layer 3 Tunnel Mode
+
+Endpoint Configuration
+Protocol
+UDP on IPv4 only
+
+Interface
+WAN
+
+Server host or address
+192.168.190.133
+
+Server port
+1194
+
+Proxy Authentication
+none
+
+Cryptographic Settings
+TLS Configuration = Use a TLS Key
+
+TLS Key
+#
+# 2048 bit OpenVPN static key
+#
+-----BEGIN OpenVPN Static key V1-----
+System Generated
+-----END OpenVPN Static key V1-----
+
+TLS Key Usage Mode
+TLS Authentication
+
+TLS keydir direction
+Direction 1
+
+Peer Certificate Authority
+NeuraWall-VPN
+
+Peer Certificate Revocation list
+None
+
+Client Certificate
+GUI default (67fe0512b6379) (Server: Yes, In Use)
+
+Data Encryption Algorithms
+AES-256-GCM, AES-128-GCM, CHACHA20-POLY1305
+
+Fallback Data Encryption Algorithm
+AES-256-CBC (256 bit key, 128 bit block)
+
+Auth digest algorithm
+SHA256 (256-bit)
+
+Hardware Crypto
+No Hardware Crypto Acceleration
+
+Server Certificate Key Usage Validation = Enforce key usage
+
+Tunnel Settings
+
+Allow Compression
+Refuse any non-stub compression (Most secure)
+
+Topology
+Subnet -- One IP address per client in a common subnet
+
+Ping settings
+Inactive
+0
+
+Ping method
+keepalive -- Use keepalive helper to define ping configuration
+keepalive helper uses interval and timeout parameters to define ping and ping-restart values as follows:
+
+
+Interval
+10
+Timeout
+60
+
+Advanced Configuration
+Exit Notify
+Retry 1x
+
+Send/Receive Buffer
+Default
+
+Verbosity level
+default
