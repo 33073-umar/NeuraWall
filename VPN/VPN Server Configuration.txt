@@ -1,1 +1,127 @@
-Server Configuration
+General Information
+Description
+VPN for Remote Access
+
+Unique VPN IDServer 1 (ovpns1)
+
+Mode Configuration
+
+Server mode
+Remote Access ( SSL/TLS + User Auth )
+
+Backend for authentication=Local Database
+
+Device mode
+tun - Layer 3 Tunnel Mode
+
+Endpoint Configuration
+
+Protocol
+UDP on IPv4 only
+
+Interface
+WAN
+
+
+Local port
+1194
+
+
+Cryptographic Settings
+TLS Configuration = Use a TLS Key
+
+TLS Key
+#
+# 2048 bit OpenVPN static key
+#
+-----BEGIN OpenVPN Static key V1-----
+System Generated
+-----END OpenVPN Static key V1-----
+
+TLS Key Usage Mode
+TLS Authentication
+
+TLS keydir direction
+Direction 0
+
+Peer Certificate Authority
+NeuraWall-VPN
+
+Peer Certificate Revocation list
+None
+
+
+Server certificate
+NeuraWall-Server-Cert (Server: Yes, CA: NeuraWall-VPN, In Use)
+
+DH Parameter Length
+2048 bit
+
+ECDH Curve
+Use Default
+
+Data Encryption Algorithms
+AES-256-GCM, AES-128-GCM, CHACHA20-POLY1305
+Allowed Data Encryption Algorithms. 
+
+Fallback Data Encryption Algorithm
+AES-256-OFB (256 bit key, 128 bit block)
+
+Auth digest algorithm
+SHA256 (256-bit)
+
+Hardware Crypto
+No Hardware Crypto Acceleration
+
+Certificate Depth
+One (Client+Server)
+
+Tunnel Settings
+
+IPv4 Tunnel Network
+10.0.0.0/24
+
+Redirect IPv4 Gateway = Force all client-generated IPv4 traffic through the tunnel.
+
+Concurrent connections
+10
+
+Allow Compression
+Refuse any non-stub compression (Most secure)
+
+Client Settings
+Dynamic IP = Allow connected clients to retain their connections if their IP address changes.
+Topology
+Subnet -- One IP address per client in a common subnet
+
+Ping settings
+Inactive = 30000
+
+Ping method
+keepalive -- Use keepalive helper to define ping configuration
+keepalive helper uses interval and timeout parameters to define ping and ping-restart values as follows:
+
+Interval
+10
+
+Timeout
+30
+
+Advanced Configuration
+
+Custom options
+push "route 192.168.190.0 255.255.255.0";
+
+
+Username as Common Name = Use the authenticated client username instead of the certificate common name (CN).
+
+Exit Notify
+Reconnect to this server / Retry once
+
+Send/Receive Buffer
+Default
+
+Gateway creation = Both
+
+Verbosity level
+default
