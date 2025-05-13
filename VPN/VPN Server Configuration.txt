@@ -1,15 +1,14 @@
 General Information
 Description
-VPN for Remote Access
+OVPN_TUN
 
-Unique VPN IDServer 1 (ovpns1)
+Unique VPN ID = Server 1 (ovpns1)
 
 Mode Configuration
 
 Server mode
-Remote Access ( SSL/TLS + User Auth )
+Remote Access ( SSL/TLS)
 
-Backend for authentication=Local Database
 
 Device mode
 tun - Layer 3 Tunnel Mode
@@ -42,7 +41,7 @@ TLS Key Usage Mode
 TLS Authentication
 
 TLS keydir direction
-Direction 0
+Use default direction
 
 Peer Certificate Authority
 NeuraWall-VPN
@@ -76,26 +75,29 @@ No Hardware Crypto Acceleration
 Certificate Depth
 One (Client+Server)
 
+Client Certificate Key Usage Validation
+Enforce key usage
+
 Tunnel Settings
 
 IPv4 Tunnel Network
-10.0.0.0/24
-
-Redirect IPv4 Gateway = Force all client-generated IPv4 traffic through the tunnel.
+10.8.0.0/24
 
 Concurrent connections
-10
+2
 
 Allow Compression
 Refuse any non-stub compression (Most secure)
 
+Inter-client communication = Allow communication between clients connected to this server
+ 
 Client Settings
 Dynamic IP = Allow connected clients to retain their connections if their IP address changes.
 Topology
 Subnet -- One IP address per client in a common subnet
 
 Ping settings
-Inactive = 30000
+Inactive = 300
 
 Ping method
 keepalive -- Use keepalive helper to define ping configuration
@@ -105,13 +107,14 @@ Interval
 10
 
 Timeout
-30
+60
 
 Advanced Configuration
 
 Custom options
-push "route 192.168.190.0 255.255.255.0";
-
+push "redirect-gateway def1 bypass-dhcp";
+push "dhcp-option DNS 8.8.8.8";
+push "dhcp-option DNS 1.1.1.1";
 
 Username as Common Name = Use the authenticated client username instead of the certificate common name (CN).
 
@@ -124,4 +127,4 @@ Default
 Gateway creation = Both
 
 Verbosity level
-default
+3(Recommended)
