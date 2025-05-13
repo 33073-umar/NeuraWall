@@ -23,6 +23,11 @@ import {
 } from "@mui/material";
 import axios from "axios";
 
+// 🔐 Sanitize function to remove dangerous characters
+const sanitizeInput = (input) => {
+  return input.replace(/[<>"'\\]/g, "").trim();
+};
+
 const WazuhLogsPage = () => {
   const [logs, setLogs] = useState([]);
   const [filteredLogs, setFilteredLogs] = useState([]);
@@ -31,20 +36,18 @@ const WazuhLogsPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [tempQuery, setTempQuery] = useState("");
   const [selectedColumn, setSelectedColumn] = useState("All");
+  const [levelOperator, setLevelOperator] = useState("="); // NEW STATE for rule_level operator
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(0);
   const [realTimeEnabled, setRealTimeEnabled] = useState(true);
 
-  // Backend endpoint
   const SERVER_URL = process.env.REACT_APP_SERVER_URL;
   const WAZUH_API = `${SERVER_URL}/api/wazuh/logs`;
 
-  // Fetch Wazuh logs
   const fetchLogs = () => {
     axios
       .get(WAZUH_API)
       .then((response) => {
-        // Reverse so latest first
         const reversed = [...response.data].reverse().map((log) => {
           const dt = new Date(log.timestamp);
           return {
@@ -74,19 +77,41 @@ const WazuhLogsPage = () => {
   }, [realTimeEnabled]);
 
   const handleSearch = () => {
-    if (!tempQuery) {
+    const safeQuery = sanitizeInput(tempQuery);
+    setSearchQuery(safeQuery);
+
+    if (!safeQuery) {
       setFilteredLogs(logs);
       return;
     }
+
     const filtered = logs.filter((log) => {
+      if (selectedColumn === "rule_level") {
+        const value = parseInt(safeQuery, 10);
+        if (isNaN(value)) return false;
+
+        switch (levelOperator) {
+          case ">":
+            return log.rule_level > value;
+          case "<":
+            return log.rule_level < value;
+          case ">=":
+            return log.rule_level >= value;
+          case "<=":
+            return log.rule_level <= value;
+          case "=":
+          default:
+            return log.rule_level === value;
+        }
+      }
+
       const valueToSearch =
         selectedColumn === "All"
           ? Object.values(log).join(" ")
           : log[selectedColumn] || "";
-      return String(valueToSearch)
-        .toLowerCase()
-        .includes(tempQuery.toLowerCase());
+      return String(valueToSearch).toLowerCase().includes(safeQuery.toLowerCase());
     });
+
     setFilteredLogs(filtered);
     setCurrentPage(0);
   };
@@ -155,12 +180,31 @@ const WazuhLogsPage = () => {
               </Select>
             </FormControl>
 
+            {/* Operator selector for rule_level */}
+            {selectedColumn === "rule_level" && (
+              <FormControl sx={{ width: "10%" }}>
+                <InputLabel id="level-operator-label">Operator</InputLabel>
+                <Select
+                  labelId="level-operator-label"
+                  value={levelOperator}
+                  label="Operator"
+                  onChange={(e) => setLevelOperator(e.target.value)}
+                >
+                  <MenuItem value="=">=</MenuItem>
+                  <MenuItem value=">">&gt;</MenuItem>
+                  <MenuItem value="<">&lt;</MenuItem>
+                  <MenuItem value=">=">&ge;</MenuItem>
+                  <MenuItem value="<=">&le;</MenuItem>
+                </Select>
+              </FormControl>
+            )}
+
             <TextField
               label="Search Query"
               variant="outlined"
               value={tempQuery}
-              onChange={(e) => setTempQuery(e.target.value)}
-              sx={{ width: "50%" }}
+              onChange={(e) => setTempQuery(sanitizeInput(e.target.value))}
+              sx={{ width: "40%" }}
             />
 
             <Button variant="contained" color="primary" onClick={handleSearch}>

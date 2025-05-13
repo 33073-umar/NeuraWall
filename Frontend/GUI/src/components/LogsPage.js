@@ -35,6 +35,11 @@ const LogsPage = () => {
   const [currentPage, setCurrentPage] = useState(0);
   const [realTimeEnabled, setRealTimeEnabled] = useState(true);
 
+const sanitizeInput = (input) => {
+  return input.replace(/[<>"'\\]/g, "").trim();
+};
+
+
   // --- Backend API Endpoint ---
   const SERVER_URL = process.env.REACT_APP_SERVER_URL;
   const LOGS_API = `${SERVER_URL}/api/logs`;
@@ -65,25 +70,28 @@ const LogsPage = () => {
     return () => clearInterval(interval);
   }, [realTimeEnabled]);
 
-  const handleSearch = () => {
-    if (!tempQuery) {
-      setFilteredLogs(logs);
-      return;
-    }
+const handleSearch = () => {
+  const safeQuery = sanitizeInput(tempQuery);
+  setSearchQuery(safeQuery);
 
-    const filtered = logs.filter((log) => {
-      const valueToSearch =
-        selectedColumn === "All"
-          ? Object.values(log).join(" ")
-          : log[selectedColumn] || "";
-      return String(valueToSearch)
-        .toLowerCase()
-        .includes(tempQuery.toLowerCase());
-    });
+  if (!safeQuery) {
+    setFilteredLogs(logs);
+    return;
+  }
 
-    setFilteredLogs(filtered);
-    setCurrentPage(0);
-  };
+  const filtered = logs.filter((log) => {
+    const valueToSearch =
+      selectedColumn === "All"
+        ? Object.values(log).join(" ")
+        : log[selectedColumn] || "";
+
+    return String(valueToSearch).toLowerCase().includes(safeQuery.toLowerCase());
+  });
+
+  setFilteredLogs(filtered);
+  setCurrentPage(0);
+};
+
 
   const handlePageChange = (_, newPage) => {
     setCurrentPage(newPage);
@@ -158,7 +166,8 @@ const LogsPage = () => {
               label="Search Query"
               variant="outlined"
               value={tempQuery}
-              onChange={(e) => setTempQuery(e.target.value)}
+              onChange={(e) => setTempQuery(sanitizeInput(e.target.value))}
+
               sx={{ width: "50%" }}
             />
 

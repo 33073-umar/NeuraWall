@@ -17,8 +17,27 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Alert,
+  IconButton,
+  InputAdornment,
 } from "@mui/material";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
 import axios from "axios";
+
+// Simple sanitization for XSS
+const sanitizeInput = (input) =>
+  input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+
+// Username rules: 3–20 chars, alphanumeric + underscore
+const isValidUsername = (u) => /^[A-Za-z0-9_]{3,20}$/.test(u.trim());
+
+// Password minimum 8 chars
+const isValidPassword = (p) => p.length >= 8;
 
 const UserManagementPage = () => {
   const SERVER_URL = process.env.REACT_APP_SERVER_URL;
@@ -31,6 +50,7 @@ const UserManagementPage = () => {
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState("watcher");
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   // Manage Users states
   const [users, setUsers] = useState([]);
@@ -39,11 +59,19 @@ const UserManagementPage = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(0);
 
-  // Edit User dialog states
+  // Edit Dialog states
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editUsername, setEditUsername] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [editRole, setEditRole] = useState("");
+  const [showEditPassword, setShowEditPassword] = useState(false);
+
+  // UI message state
+  const [uiMessage, setUIMessage] = useState({ text: "", severity: "" });
+
+  // Confirmation dialog for delete
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [toDeleteUser, setToDeleteUser] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("authToken");
@@ -54,6 +82,7 @@ const UserManagementPage = () => {
 
   const fetchUsers = () => {
     setLoading(true);
+    setError(null);
     axios
       .get(LIST_USERS_API)
       .then((res) => {
@@ -74,36 +103,72 @@ const UserManagementPage = () => {
   }, [currentTab]);
 
   const handleCreateUser = () => {
-    if (!newUsername || !newPassword) {
-      alert("Please fill in all fields.");
+    setUIMessage({ text: "", severity: "" });
+
+    if (!isValidUsername(newUsername)) {
+      setUIMessage({
+        text: "Username must be 3–20 chars (letters, numbers, underscore).",
+        severity: "warning",
+      });
       return;
     }
-    const body = { username: newUsername, password: newPassword, role: newRole };
+    if (!isValidPassword(newPassword)) {
+      setUIMessage({
+        text: "Password must be at least 8 characters.",
+        severity: "warning",
+      });
+      return;
+    }
+
+    const body = {
+      username: sanitizeInput(newUsername.trim()),
+      password: sanitizeInput(newPassword),
+      role: sanitizeInput(newRole),
+    };
+
     axios
       .post(CREATE_USER_API, body)
       .then((res) => {
-        alert(res.data.message || "User created successfully.");
+        setUIMessage({
+          text: res.data.message || "User created successfully.",
+          severity: "success",
+        });
         setNewUsername("");
         setNewPassword("");
         setNewRole("watcher");
+        setShowNewPassword(false);
       })
       .catch((err) => {
         console.error("Error creating user:", err);
-        alert(err.response?.data?.error || "Failed to create user.");
+        setUIMessage({
+          text: err.response?.data?.error || "Failed to create user.",
+          severity: "error",
+        });
       });
   };
 
-  const handleDeleteUser = (username) => {
-    if (!window.confirm(`Are you sure you want to delete user ${username}?`)) return;
+  const handleDeleteConfirm = (username) => {
+    setToDeleteUser(username);
+    setConfirmOpen(true);
+  };
+
+  const handleDeleteUser = () => {
+    setConfirmOpen(false);
     axios
-      .delete(`${LIST_USERS_API}/${username}`)
+      .delete(`${LIST_USERS_API}/${encodeURIComponent(toDeleteUser)}`)
       .then((res) => {
-        setUsers((prev) => prev.filter((u) => u.username !== username));
-        alert(res.data.message || "User deleted successfully.");
+        setUsers((prev) => prev.filter((u) => u.username !== toDeleteUser));
+        setUIMessage({
+          text: res.data.message || "User deleted successfully.",
+          severity: "info",
+        });
       })
       .catch((err) => {
         console.error("Error deleting user:", err);
-        alert(err.response?.data?.error || "Failed to delete user.");
+        setUIMessage({
+          text: err.response?.data?.error || "Failed to delete user.",
+          severity: "error",
+        });
       });
   };
 
@@ -111,33 +176,51 @@ const UserManagementPage = () => {
     setEditUsername(username);
     setEditPassword("");
     setEditRole(role);
+    setShowEditPassword(false);
     setEditDialogOpen(true);
   };
 
   const handleUpdateUser = () => {
+    setUIMessage({ text: "", severity: "" });
+
     const body = {};
-    if (editPassword) body.password = editPassword;
-    if (editRole) body.role = editRole;
+    if (editPassword) {
+      if (!isValidPassword(editPassword)) {
+        setUIMessage({
+          text: "Password must be at least 8 characters.",
+          severity: "warning",
+        });
+        return;
+      }
+      body.password = sanitizeInput(editPassword);
+    }
+    if (editRole) {
+      body.role = sanitizeInput(editRole);
+    }
 
     axios
-      .put(`${LIST_USERS_API}/${editUsername}`, body)
+      .put(`${LIST_USERS_API}/${encodeURIComponent(editUsername)}`, body)
       .then((res) => {
-        alert(res.data.message || "User updated successfully.");
+        setUIMessage({
+          text: res.data.message || "User updated successfully.",
+          severity: "success",
+        });
         setEditDialogOpen(false);
         fetchUsers();
       })
       .catch((err) => {
         console.error("Error updating user:", err);
-        alert(err.response?.data?.error || "Failed to update user.");
+        setUIMessage({
+          text: err.response?.data?.error || "Failed to update user.",
+          severity: "error",
+        });
       });
   };
 
   const handlePageChange = (_, newPage) => setCurrentPage(newPage);
-  const handleRowsPerPageChange = (event) => {
+  const handleRowsPerPageChange = (e) => {
     const value =
-      event.target.value === "All"
-        ? users.length
-        : parseInt(event.target.value, 10);
+      e.target.value === "All" ? users.length : parseInt(e.target.value, 10);
     setRowsPerPage(value);
     setCurrentPage(0);
   };
@@ -146,17 +229,28 @@ const UserManagementPage = () => {
     const paginated =
       rowsPerPage === users.length
         ? users
-        : users.slice(currentPage * rowsPerPage, currentPage * rowsPerPage + rowsPerPage);
+        : users.slice(
+            currentPage * rowsPerPage,
+            currentPage * rowsPerPage + rowsPerPage
+          );
     return (
       <>
         {paginated.map((user, idx) => (
           <Paper
             key={idx}
             elevation={2}
-            sx={{ p: 2, mb: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}
+            sx={{
+              p: 2,
+              mb: 2,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
           >
             <Box>
-              <Typography variant="body1"><strong>{user.username}</strong></Typography>
+              <Typography variant="body1">
+                <strong>{user.username}</strong>
+              </Typography>
               <Typography variant="body2">Role: {user.role}</Typography>
             </Box>
             <Box>
@@ -170,7 +264,7 @@ const UserManagementPage = () => {
               <Button
                 variant="contained"
                 color="error"
-                onClick={() => handleDeleteUser(user.username)}
+                onClick={() => handleDeleteConfirm(user.username)}
               >
                 Delete
               </Button>
@@ -197,6 +291,12 @@ const UserManagementPage = () => {
         User Management
       </Typography>
 
+      {uiMessage.text && (
+        <Alert severity={uiMessage.severity} sx={{ mb: 2 }}>
+          {uiMessage.text}
+        </Alert>
+      )}
+
       <Tabs
         value={currentTab}
         onChange={(_, v) => setCurrentTab(v)}
@@ -216,15 +316,33 @@ const UserManagementPage = () => {
             sx={{ mb: 2 }}
             value={newUsername}
             onChange={(e) => setNewUsername(e.target.value)}
+            inputProps={{
+              maxLength: 20,
+              pattern: "[A-Za-z0-9_]{3,20}",
+              title: "3–20 chars: letters, numbers, or underscore",
+            }}
           />
           <TextField
             label="Password"
-            type="password"
+            type={showNewPassword ? "text" : "password"}
             variant="outlined"
             fullWidth
             sx={{ mb: 2 }}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
+            inputProps={{ minLength: 8, title: "At least 8 characters" }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setShowNewPassword((prev) => !prev)}
+                    edge="end"
+                  >
+                    {showNewPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
           <FormControl fullWidth sx={{ mb: 2 }}>
             <InputLabel>Role</InputLabel>
@@ -258,18 +376,45 @@ const UserManagementPage = () => {
         <Typography textAlign="center">No users found.</Typography>
       )}
 
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          Are you sure you want to delete user “{toDeleteUser}”?
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={handleDeleteUser}>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Edit User Dialog */}
       <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)}>
         <DialogTitle>Edit User: {editUsername}</DialogTitle>
         <DialogContent>
           <TextField
             label="New Password"
-            type="password"
+            type={showEditPassword ? "text" : "password"}
             fullWidth
             sx={{ mt: 2 }}
             value={editPassword}
             onChange={(e) => setEditPassword(e.target.value)}
             placeholder="Leave blank to keep unchanged"
+            inputProps={{ minLength: 8, title: "At least 8 characters" }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setShowEditPassword((prev) => !prev)}
+                    edge="end"
+                  >
+                    {showEditPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
           <FormControl fullWidth sx={{ mt: 2 }}>
             <InputLabel>Role</InputLabel>
@@ -285,7 +430,9 @@ const UserManagementPage = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleUpdateUser}>Save</Button>
+          <Button variant="contained" onClick={handleUpdateUser}>
+            Save
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

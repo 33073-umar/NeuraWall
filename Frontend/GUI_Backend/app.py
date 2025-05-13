@@ -565,13 +565,15 @@ def delete_user(username):
     return jsonify({"message": f"User {username} deleted"}), 200
 
 
-LOG_DIR = "/path/to/wazuh/logs"  # Set this to the base directory where Wazuh generates logs
+LOG_DIR = "/var/ossec/logs/alerts"  # Adjusted to your actual log directory
 
-def find_latest_log_file(directory):
+def find_latest_json_log_file(directory):
     latest_file = None
     latest_mtime = 0
     for root, _, files in os.walk(directory):
         for fname in files:
+            if not fname.endswith('.json'):
+                continue  # Only consider .json files
             fpath = os.path.join(root, fname)
             try:
                 mtime = os.path.getmtime(fpath)
@@ -585,7 +587,8 @@ def find_latest_log_file(directory):
 @app.route('/api/wazuh/logs', methods=['GET'])
 def get_wazuh_logs():
     try:
-        latest_log_path = find_latest_log_file(LOG_DIR)
+        latest_log_path = find_latest_json_log_file(LOG_DIR)
+        print(latest_log_path)
         if not latest_log_path:
             return jsonify({"error": "No log files found"}), 404
 
