@@ -1,1 +1,21 @@
-VPN Certificate Configuration
+Descriptive name
+NeuraWall-VPN
+
+Method
+Import an existing Certificate Authority
+
+Randomize Serial = Use random serial numbers when signing certificates
+
+Certificate data
+-----BEGIN CERTIFICATE-----
+System Generated
+-----END CERTIFICATE-----
+
+Paste a certificate in X.509 PEM format here.
+Certificate Private Key (optional)
+-----BEGIN PRIVATE KEY-----
+System Generated
+-----END PRIVATE KEY-----
+
+Next Certificate Serial
+1
