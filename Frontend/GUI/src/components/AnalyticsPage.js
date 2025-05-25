@@ -245,7 +245,7 @@ const AnalyticsPage = () => {
           {/* Charts */}
           <Grid container spacing={4}>
             <Grid item xs={12} md={6}>
-              <Card sx={{ p: 2, height: 350, borderRadius: 2, boxShadow: 3 }}>
+              <Card sx={{ p: 2, height: 530, borderRadius: 2, boxShadow: 3 }}>
                 <Typography variant="subtitle1" textAlign="center" mb={1}>
                   Protocol Distribution
                 </Typography>
@@ -268,7 +268,7 @@ const AnalyticsPage = () => {
             </Grid>
 
             <Grid item xs={12} md={6}>
-              <Card sx={{ p: 2, height: 350, borderRadius: 2, boxShadow: 3 }}>
+              <Card sx={{ p: 2, height: 530, borderRadius: 2, boxShadow: 3 }}>
                 <Typography variant="subtitle1" textAlign="center" mb={1}>
                   Malicious vs Benign
                 </Typography>
